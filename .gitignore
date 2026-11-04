@@ -3,3 +3,10 @@ data/
 __pycache__/
 runtime/node_modules/
 .npm-cache/
+
+# Local machine and environment files
+.DS_Store
+node_modules/
+.env
+.env.*
+!.env.example
