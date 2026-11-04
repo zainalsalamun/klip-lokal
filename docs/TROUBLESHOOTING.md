@@ -39,7 +39,7 @@ Gunakan interpreter `.venv/bin/python`, lalu pasang versi terkunci:
 
 Kombinasi PyAV 19 dan faster-whisper 1.2.1 pernah gagal dengan `open() got an unexpected keyword argument 'metadata_errors'`; requirements mengunci PyAV 16.1.0. Jangan memperbarui PyAV sendiri tanpa uji pipeline.
 
-Jika proyek dipindahkan lagi ke lokasi lain dan executable venv masih merujuk path lama, buat ulang `.venv` pada lokasi baru dan instal requirements. Lingkungan virtual bukan artefak portabel antarperangkat. Pada perpindahan ke folder development saat ini, path launcher lingkungan telah disesuaikan dan diverifikasi.
+Jika proyek dipindahkan lagi ke lokasi lain dan executable venv masih merujuk path lama, buat ulang `.venv` pada lokasi baru dan instal requirements. Lingkungan virtual bukan artefak portabel antarperangkat. Buat lingkungan baru setelah clone, alih-alih menyalin lingkungan virtual dari komputer lain.
 
 ## YouTube unavailable, 403, bot check, atau sign-in
 
@@ -84,3 +84,7 @@ Hentikan server setelah pekerjaan selesai, lalu tinjau `data/<id>/` di Finder. H
 ## Informasi saat melaporkan masalah
 
 Sertakan tahap/error, versi Python, pilihan durasi/jumlah/bahasa, apakah input URL atau unggahan, dan apakah video lain juga gagal. Jangan membagikan sumber video privat, transkrip sensitif atau kredensial sebagai log. `job.json` dan `transcript.json` dapat berisi judul dan isi percakapan.
+
+## Pesan koneksi muncul padahal server sehat
+
+Versi antarmuka lama pernah mengklasifikasikan semua TypeError sebagai error jaringan, termasuk akses elemen UI yang belum ada pada template lama. Versi terbaru hanya memberi ConnectionError bila fetch gagal, membedakan respons server dan kegagalan rendering, serta memakai versi aset pada URL CSS/JS untuk mencegah cache lama. Jika pesan lama masih tampil, refresh halaman atau lakukan hard refresh (⌘ShiftR di Chrome Mac). Periksa /api/health dan buka kembali pekerjaan dari history; jangan memproses ulang video yang sudah berstatus selesai.

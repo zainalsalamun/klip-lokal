@@ -13,10 +13,20 @@ python3 --version
 npm --version
 ```
 
+## Clone dan folder kerja
+
+Ganti `URL_REPOSITORY` dengan URL Git sebenarnya, lalu jalankan:
+
+```sh
+git clone URL_REPOSITORY klip-lokal
+cd klip-lokal
+```
+
+Semua perintah berikut dijalankan dari root repository. Jika sudah berada di root proyek, tidak perlu `cd` lagi. Nama folder dan lokasi clone bebas; `klip-lokal` hanya nama folder contoh.
+
 ## Launcher macOS
 
 ```sh
-cd /Users/macbookpro/development/klip-lokal
 chmod +x Mulai.command
 ./Mulai.command
 ```
@@ -38,7 +48,6 @@ Launcher memeriksa keberadaan dependensi, bukan selalu menyelaraskan versinya de
 ## Mode Terminal editor
 
 ```sh
-cd /Users/macbookpro/development/klip-lokal
 npm run dev
 ```
 
@@ -51,7 +60,6 @@ Mode ini tidak membuka browser otomatis dan tidak memakai auto-reload. Buka alam
 Salin source, `requirements.txt`, folder `templates/`, `static/`, dan `runtime/package*.json`. Jangan menyalin `.venv`, `runtime/node_modules`, atau cache npm antarperangkat. Data/model boleh dipindahkan terpisah jika memang ingin mempertahankannya.
 
 ```sh
-cd /Users/macbookpro/development/klip-lokal
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 npm --cache "$PWD/.npm-cache" --prefix runtime ci --no-audit --no-fund
@@ -76,3 +84,5 @@ Pembaruan yt-dlp kadang diperlukan ketika YouTube berubah. Ubah versi dalam requ
 ## Konfigurasi
 
 Versi ini belum memiliki file `.env` atau pengaturan konfigurasi melalui UI. Host/port, model, codec dan resolusi ditetapkan di `app.py`; lokasi perubahan ada di [panduan pengembangan](DEVELOPMENT.md). `HF_HUB_DISABLE_XET=1` dipasang sebagai default lingkungan oleh aplikasi untuk menghindari masalah unduhan model melalui Xet yang terlihat saat setup. Cache model ada di `data/models/`.
+
+Pelacakan pembicara memerlukan `opencv-python-headless` (tercantum di requirements). Instalasi lama: jalankan `.venv/bin/python -m pip install -r requirements.txt`, lalu restart server saat tidak ada video aktif. Launcher juga memeriksa import `cv2`. Model Haar sudah disertakan paket, tanpa unduhan model tambahan.
