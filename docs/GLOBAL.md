@@ -18,7 +18,7 @@ Riwayat lokal dan Global ditampilkan bersama. Pekerjaan Global diberi keterangan
 
 Request Global mengirim `audience=global_en` dan `topic`. `language` tetap kode bahasa sumber. faster-whisper menerima `task="translate"`, sedangkan Studio klip biasa memakai `task="transcribe"`. Terjemahan Whisper diarahkan ke bahasa Inggris. Audio hasil tetap berasal dari sumber melalui FFmpeg, tanpa sintesis suara.
 
-Caption Global mengambil cuplikan transkrip Inggris (maksimum 16 kata / sekitar 120 karakter), tanpa CTA atau hashtag otomatis. Ini draft template, bukan copywriting kreatif atau prediksi viralitas. Fokus konten menambahkan bobot keyword Inggris ke skor kandidat; fokus tidak menjamin sumber benar-benar membahas topik tersebut. Tidak ada pencarian semantik/gambar.
+Caption Global dirangkum AI lokal dari transkrip Inggris, target 6–12 kata, tanpa CTA/hashtag otomatis. Ini draft yang perlu ditinjau, bukan prediksi viralitas. Lihat [setup AI lokal](LOCAL_AI.md). Fokus konten menambahkan bobot keyword Inggris ke skor kandidat; fokus tidak menjamin sumber benar-benar membahas topik tersebut. Tidak ada pencarian semantik/gambar.
 
 ## Rekomendasi konten
 

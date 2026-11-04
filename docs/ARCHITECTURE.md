@@ -68,3 +68,6 @@ Penyimpanan masih memakai direktori JSON: setiap pencarian tetap memindai nama/s
 
 
 Preset tampilan subtitle didefinisikan di `subtitle_styles.py`. UI merender daftar dari konfigurasi backend; server memvalidasi whitelist, menyimpan `subtitle_style`, dan meneruskannya ke `write_subs()`. Preset mengganti ASS style (warna, bobot, ukuran, outline/latar) tanpa mengubah segmentasi atau timestamp. Semua memakai kanvas 720×1280 sehingga skala tetap konsisten di setiap resolusi. Preview CSS adalah ilustrasi preset, bukan render ASS.
+
+
+Setelah ekspor MP4, worker menjalankan `local_caption.summarize()` berurutan pada transkrip tiap klip. Runtime memakai Ollama loopback dengan model Qwen3 1.7B. Output JSON harus memuat caption singkat dan kutipan pendukung yang ada dalam transkrip. Kegagalan AI tidak menggagalkan video. Endpoint regenerasi caption memperbarui metadata secara atomik tanpa menulis video; permintaan tidak memegang lock pekerjaan selama inferensi. Tidak ada cloud fallback.

@@ -86,3 +86,6 @@ Pembaruan yt-dlp kadang diperlukan ketika YouTube berubah. Ubah versi dalam requ
 Versi ini belum memiliki file `.env` atau pengaturan konfigurasi melalui UI. Host/port, model, codec dan resolusi ditetapkan di `app.py`; lokasi perubahan ada di [panduan pengembangan](DEVELOPMENT.md). `HF_HUB_DISABLE_XET=1` dipasang sebagai default lingkungan oleh aplikasi untuk menghindari masalah unduhan model melalui Xet yang terlihat saat setup. Cache model ada di `data/models/`.
 
 Pelacakan pembicara memerlukan `opencv-python-headless` (tercantum di requirements). Instalasi lama: jalankan `.venv/bin/python -m pip install -r requirements.txt`, lalu restart server saat tidak ada video aktif. Launcher juga memeriksa import `cv2`. Model Haar sudah disertakan paket, tanpa unduhan model tambahan.
+
+
+Untuk caption yang merangkum topik, gunakan [setup AI lokal](LOCAL_AI.md). Ollama dan model caption terpisah dari model Whisper. Video tetap dapat diekspor jika AI caption belum siap.

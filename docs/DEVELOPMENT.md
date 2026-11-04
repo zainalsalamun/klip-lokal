@@ -151,3 +151,6 @@ Tes `test_speech_cuts.py` memeriksa segmen ucapan utuh, akhir kalimat, batas dur
 
 
 `tests/test_subtitle_styles.py` memeriksa validasi preset, penyimpanan/restart, penerusan opsi worker, fallback history lama, dan render MP4 semua gaya di 480p serta 720p. Frame ekspor dibandingkan agar setiap preset benar-benar berbeda; piksel kuning juga diverifikasi. Preset default mempertahankan ASS style sebelumnya. Untuk menambah gaya, daftarkan di `subtitle_styles.py` dan tambahkan aturan preview CSS dengan nama preset yang sama.
+
+
+Caption semantik: `local_caption.py` memakai Ollama loopback dengan JSON schema, `think=false`, context 2048, batas output, kutipan pendukung verbatim dan penolakan transkrip tidak jelas. `tests/test_local_caption.py` menguji payload bahasa/privasi lokal, parsing/validasi, model tidak tersedia, persistensi endpoint, pelestarian video/caption pada kegagalan dan guard video aktif. Unit test memalsukan transport AI; uji model nyata dilakukan terpisah sesudah setup.
