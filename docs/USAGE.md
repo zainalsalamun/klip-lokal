@@ -12,7 +12,7 @@ Memilih file mengosongkan URL; mengisi URL mengosongkan pilihan file. Pada reque
 
 | Pilihan | Nilai | Makna |
 | --- | --- | --- |
-| Durasi | 15, 30, 45, 60 detik | Durasi maksimum setiap kandidat |
+| Durasi | 15, 30, 45, 60 detik | Target durasi; mengikuti akhir ucapan |
 | Jumlah | 1, 3, 5 | Jumlah maksimum klip tanpa tumpang tindih |
 | Resolusi hasil | 480p, 720p, 1080p | 480×854, 720×1280 (default), 1080×1920; tersimpan di history |
 | Bahasa | Otomatis, Indonesia, English | Bahasa ucapan untuk Whisper; bukan terjemahan |
@@ -21,7 +21,7 @@ Menu pilihan memakai tampilan terang yang seragam. Klik opsi untuk memilih; keyb
 
 ## Meninjau hasil
 
-Hasil diurutkan menurut skor kandidat, bukan urutan waktu video. Setiap kartu menampilkan pemutar, waktu awal/akhir pada sumber, kutipan transkrip, dan **Unduh MP4**. Teks kutipan berasal dari segmen transkrip dan dapat mencakup kata di luar batas akhir klip apabila segmen melewati batas durasi.
+Hasil diurutkan menurut skor kandidat, bukan urutan waktu video. Setiap kartu menampilkan pemutar, waktu awal/akhir pada sumber, kutipan transkrip, dan **Unduh MP4**. Teks kutipan berasal dari segmen transkrip utuh yang dipilih untuk klip.
 
 Tinjau isi, crop dan subtitle sebelum membagikan hasil. Resolusi bisa dipilih sebelum memproses: 480p lebih ringan, 720p default, 1080p lebih besar. Pilihan ini menentukan ukuran ekspor; tidak mengubah format unduhan sumber. 480×854 merupakan pembulatan dimensi vertikal agar sesuai encoder H.264. Kanvas ASS tetap 720×1280 dan FFmpeg menskalakan subtitle mengikuti ukuran keluaran. Crop memperkirakan pembicara dari deteksi wajah dan gerakan mulut saat audio aktif; bila wajah tidak terdeteksi atau pelacakan gagal, dipakai crop tengah. Video landscape akan kehilangan sisi kiri/kanan. Sumber resolusi rendah dapat terlihat buram setelah diperbesar. Subtitle menyatu dengan gambar dan tidak bisa dimatikan di pemutar; berkas ASS sumber tetap tersedia di folder pekerjaan.
 
@@ -29,7 +29,7 @@ Subtitle dikelompokkan sampai delapan kata. Durasi kelompok dibagi rata di dalam
 
 ## Caption posting
 
-Setiap klip memiliki draft caption terpisah dari subtitle video. Draft mengambil satu kalimat dari transkrip klip, maksimal 16 kata / 121 karakter termasuk elipsis, tanpa ajakan komentar dan hashtag otomatis. Ini template berbasis transkrip, belum penulisan kreatif dengan model AI. Tinjau akurasi dan konteks sebelum memposting.
+Setiap klip memiliki caption terpisah dari subtitle video. AI lokal membaca transkrip klip dan merangkum inti pembahasan menjadi satu kalimat singkat, target 6–12 kata, tanpa CTA/hashtag. Ini membutuhkan Ollama dan model Qwen3 1.7B; lihat [setup AI lokal](LOCAL_AI.md). Caption hasil lama dapat dirangkum lewat **Buat caption AI lokal** tanpa memproses ulang MP4. Bila transkrip kurang jelas atau AI tidak tersedia, aplikasi memberi alasan dan tetap menyediakan editor manual. Tinjau akurasi dan konteks sebelum memposting.
 
 Edit teks pada **Caption posting**, klik **Salin caption**, atau **Unduh TXT**. TXT mengikuti teks hasil edit. Perubahan disimpan otomatis di localStorage browser untuk setiap klip; refresh di browser yang sama akan mempertahankan edit. Perubahan belum disinkronkan ke server atau browser lain. Jika storage browser dibersihkan, draft kembali ke teks awal. Bila akses clipboard ditolak, teks diseleksi dan dapat disalin dengan ⌘C/Ctrl+C.
 
@@ -77,4 +77,4 @@ Di form Studio klip maupun Studio Global, buka **Gaya subtitle**. Tersedia Klasi
 Pilihan disimpan pada pekerjaan dan klip. Membuka history mengembalikan pilihannya di form. Hasil lama tetap menggunakan Klasik. Mengubah dropdown hanya memengaruhi pemrosesan baru; untuk mengganti gaya video yang sudah jadi, proses ulang sumbernya. **Buat klip baru** mengembalikan gaya default Klasik.
 
 
-Caption posting kini berupa rekomendasi satu kalimat singkat, maksimal 16 kata / 121 karakter termasuk elipsis, tanpa CTA dan hashtag otomatis. Rekomendasi mengambil kalimat transkrip yang cukup panjang, lalu membatasi panjangnya; bukan ringkasan semantik AI. Template otomatis versi lama diganti saat dibaca tanpa mengubah file/video lama. Caption hasil edit di browser tetap dipertahankan; tombol **Pakai rekomendasi singkat** mengembalikan rekomendasi pendek.
+Caption lama yang belum dirangkum AI ditandai sebagai cuplikan transkrip. Gunakan **Buat caption AI lokal** untuk menghasilkan ringkasan pembahasan. Draft yang sudah diedit meminta konfirmasi sebelum diganti.
