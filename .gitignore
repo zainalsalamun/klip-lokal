@@ -1,0 +1,5 @@
+.venv/
+data/
+__pycache__/
+runtime/node_modules/
+.npm-cache/

@@ -1,0 +1,9 @@
+{
+  "name": "klip-lokal",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "./dev.sh",
+    "start": "./dev.sh"
+  }
+}
