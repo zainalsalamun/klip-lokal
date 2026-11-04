@@ -119,3 +119,8 @@ Klip baru menyertakan `framing`: `mode` bernilai `speaker_estimate` atau `center
 
 
 Caption posting kini berupa rekomendasi satu kalimat singkat, maksimal 16 kata / 121 karakter termasuk elipsis, tanpa CTA dan hashtag otomatis. Rekomendasi mengambil kalimat transkrip yang cukup panjang, lalu membatasi panjangnya; bukan ringkasan semantik AI. Template otomatis versi lama diganti saat dibaca tanpa mengubah file/video lama. Caption hasil edit di browser tetap dipertahankan; tombol **Pakai rekomendasi singkat** mengembalikan rekomendasi pendek.
+
+
+### `POST /api/jobs/<id>/clips/<index>/caption`
+
+`index` mulai dari 0. Merangkum transkrip klip lewat Ollama lokal dan menyimpan caption pada metadata, tanpa ekspor ulang video. Respons 200: `caption`, `caption_source=ai_local`, `caption_model`, `caption_evidence` (kutipan pendukung), `caption_status=ready`, dan `caption_note`. 404 untuk job/klip tidak ada, 409 jika video aktif, 422 jika transkrip kurang jelas/tidak didukung bukti, 503 jika runtime/model/hasil AI belum tersedia. Kegagalan tidak menimpa caption sebelumnya. Permintaan bisa memerlukan hingga 180 detik ditambah waktu start runtime. Klip baru otomatis mencoba AI setelah ekspor; kegagalan AI menyimpan status `needs_review`/`unavailable` serta alasan tanpa menggagalkan MP4.
