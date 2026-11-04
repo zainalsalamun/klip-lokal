@@ -91,3 +91,6 @@ Komponen utama: [Flask](https://flask.palletsprojects.com/), [yt-dlp](https://gi
 
 
 Caption posting kini berupa rekomendasi satu kalimat singkat, maksimal 16 kata / 121 karakter termasuk elipsis, tanpa CTA dan hashtag otomatis. Rekomendasi mengambil kalimat transkrip yang cukup panjang, lalu membatasi panjangnya; bukan ringkasan semantik AI. Template otomatis versi lama diganti saat dibaca tanpa mengubah file/video lama. Caption hasil edit di browser tetap dipertahankan; tombol **Pakai rekomendasi singkat** mengembalikan rekomendasi pendek.
+
+
+**Caption AI lokal:** pasang Ollama dan jalankan `npm run setup:ai` setelah environment Python tersedia. Model Qwen3 1.7B merangkum topik tiap klip menjadi satu kalimat; hasil lama bisa diproses lewat tombol **Buat caption AI lokal**, tanpa ekspor ulang. Lihat [setup dan batas akurasi](docs/LOCAL_AI.md).
