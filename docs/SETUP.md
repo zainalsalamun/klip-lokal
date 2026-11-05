@@ -1,5 +1,7 @@
 # Instalasi dan menjalankan
 
+Untuk instalasi di komputer lain, mulai dari [NEW_MACHINE](NEW_MACHINE.md). Command setup dapat diulang dan tidak membutuhkan path laptop pembuat.
+
 ## Prasyarat
 
 Target yang telah diverifikasi adalah macOS Apple Silicon dengan Python 3.13.3. Gunakan Python 3.11–3.13 untuk instalasi baru. Diperlukan `python3`, `npm`, ruang disk untuk dependensi/model serta sumber dan hasil video, dan internet saat setup. Belum diuji pada Windows atau Linux. Launcher `.command` khusus macOS.
@@ -31,7 +33,7 @@ chmod +x Mulai.command
 ./Mulai.command
 ```
 
-Launcher membuat `.venv` jika belum ada, memasang dependensi bila impor utama belum tersedia, dan memasang runtime Node bila binarinya belum ada. Kemudian `serverctl.py start` menjalankan Flask melalui job launchd sesi pengguna (`local.klip.server`), menunggu health check berhasil, baru browser dibuka ke http://127.0.0.1:8765. Terminal boleh ditutup setelah server siap. Tidak ada login item yang dipasang: setelah restart/logout, jalankan launcher lagi. Log tersimpan di `data/server.log`.
+Launcher memanggil `setup_local.py`: memilih Python 3.11–3.13, membuat `.venv` jika belum ada, menyelaraskan requirements bila hash berubah/impor gagal, dan memasang runtime Node proyek bila belum ada. Kemudian `serverctl.py start` menjalankan Flask melalui job launchd sesi pengguna (`local.klip.server`), menunggu health check berhasil, baru browser dibuka ke http://127.0.0.1:8765. Terminal boleh ditutup setelah server siap. Tidak ada login item yang dipasang: setelah restart/logout, jalankan launcher lagi. Log tersimpan di `data/server.log`.
 
 Klik dua kali `Berhenti.command` untuk menghentikan server. Controller menolak penghentian bila ada pekerjaan aktif. Alternatif Terminal:
 
@@ -43,7 +45,7 @@ Klik dua kali `Berhenti.command` untuk menghentikan server. Controller menolak p
 
 Menjalankan launcher lagi saat server sehat akan memakai server yang sama. Bila server crash, jalankan launcher kembali. Server manual `.venv/bin/python app.py` tetap memerlukan Terminal terbuka dan dihentikan dengan Control-C.
 
-Launcher memeriksa keberadaan dependensi, bukan selalu menyelaraskan versinya dengan requirements. Setelah mengubah requirements, jalankan instalasi manual di bawah.
+Setup mencatat hash requirements di `.venv/.klip-requirements.sha256` setelah instalasi berhasil. Requirements berubah memicu pemasangan ulang; environment yang tidak kompatibel tidak dihapus otomatis.
 
 ## Mode Terminal editor
 
@@ -51,13 +53,13 @@ Launcher memeriksa keberadaan dependensi, bukan selalu menyelaraskan versinya de
 npm run dev
 ```
 
-Atau `./dev.sh` / `npm start`. Mode ini berjalan foreground: Terminal harus tetap terbuka dan Ctrl+C menghentikan server. Script menyiapkan dependensi jika belum tersedia, lalu menghentikan server launcher sebelum mengambil port yang sama. Jika ada video aktif, penghentian ditolak dan mode Terminal tidak dimulai. Tunggu pekerjaan selesai lalu ulangi. Server manual lain harus dihentikan di Terminal asalnya.
+Atau `./dev.sh` / `npm start`. Mode ini berjalan foreground: Terminal harus tetap terbuka dan Ctrl+C menghentikan server. Script menjalankan bootstrap dasar yang sama, lalu menghentikan server launcher sebelum mengambil port yang sama. Jika ada video aktif, penghentian ditolak dan mode Terminal tidak dimulai. Tunggu pekerjaan selesai lalu ulangi. Server manual lain harus dihentikan di Terminal asalnya.
 
-Mode ini tidak membuka browser otomatis dan tidak memakai auto-reload. Buka alamat yang tercetak di Terminal. Perubahan Python memerlukan restart; perubahan HTML/CSS/JavaScript memerlukan refresh browser.
+Mode ini tidak membuka browser otomatis dan tidak memakai auto-reload. Buka alamat yang tercetak di Terminal. Perubahan Python/template Jinja memerlukan restart saat idle; perubahan CSS/JavaScript memerlukan refresh browser.
 
 ## Instalasi manual / perangkat baru
 
-Salin source, `requirements.txt`, folder `templates/`, `static/`, dan `runtime/package*.json`. Jangan menyalin `.venv`, `runtime/node_modules`, atau cache npm antarperangkat. Data/model boleh dipindahkan terpisah jika memang ingin mempertahankannya.
+Clone seluruh source repository, termasuk modul Python, `setup_local.py`, template, aset dan metadata runtime Node. Jangan menyalin `.venv`, `runtime/node_modules`, atau cache npm antarperangkat. Data/model boleh dipindahkan terpisah jika memang ingin mempertahankannya.
 
 ```sh
 python3 -m venv .venv

@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "./dev.sh",
-    "start": "./dev.sh"
+    "start": "./dev.sh",
+    "setup:ai": "python3 setup_local.py ai",
+    "setup": "python3 setup_local.py setup",
+    "doctor": "python3 setup_local.py doctor"
   }
 }
