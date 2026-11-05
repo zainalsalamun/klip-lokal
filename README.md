@@ -17,6 +17,18 @@ cd klip-lokal
 
 Jika source sudah terbuka di editor, buka Terminal pada root proyek; tidak perlu menjalankan `cd` lagi.
 
+Untuk komputer baru, ikuti [panduan perangkat baru](docs/NEW_MACHINE.md). Setelah Python 3.11–3.13, npm dan Ollama dipasang:
+
+```sh
+npm run setup
+npm run setup:ai
+npm run doctor
+npm run dev
+```
+
+`setup` membuat environment dan memasang dependensi proyek. `setup:ai` memeriksa runtime lokal dan mengunduh model jika belum tersedia. `doctor` memeriksa kesiapan tanpa mengubah instalasi. Setup dapat diulang; model yang sudah ada dipakai kembali. Ollama perlu dipasang pengguna terlebih dahulu dari sumber resmi. Windows/Linux belum didukung end-to-end oleh aplikasi.
+
+
 ### Pilihan 1: berjalan langsung di Terminal
 
 ```sh
@@ -46,20 +58,27 @@ Semua script mencari source relatif terhadap lokasinya sendiri. Folder repositor
 ## Penggunaan
 
 1. Tempel link satu video YouTube atau pilih file video dari laptop.
-2. Tentukan durasi maksimum 15/30/45/60 detik, jumlah kandidat 1/3/5, bahasa suara, dan resolusi hasil.
-3. Klik **Cari momen & buat klip** dan tunggu proses selesai.
-4. Pilih **Gaya subtitle** sesuai selera: Klasik (default), Kuning tebal, Kotak gelap, atau Minimal. Preview tersedia sebelum memproses.
-5. Putar hasil untuk meninjau crop, isi, dan subtitle; unduh MP4 yang dipilih. Di bawah tiap klip tersedia **Caption posting** yang bisa diedit, disalin atau diunduh sebagai TXT.
-5. Klik **Buat klip baru** untuk video berikutnya. Hasil sebelumnya tersedia di **Riwayat klip**, termasuk setelah refresh/restart. Daftar ditampilkan 10 video per halaman, dengan pencarian judul/link dan filter status.
-6. Klik **Hapus** pada history yang tidak diperlukan untuk menghapus seluruh berkas pekerjaan dari disk, lalu konfirmasi. Pekerjaan aktif tidak bisa dihapus.
+2. Tentukan target durasi 15/30/45/60 detik, jumlah kandidat 1/3/5, bahasa suara, dan resolusi hasil.
+3. Pilih **Gaya subtitle**: Klasik (default), Kuning tebal, Kotak gelap, atau Minimal. Preview tersedia sebelum memproses.
+4. Klik **Cari momen & buat klip** dan tunggu proses selesai.
+5. Putar hasil untuk meninjau crop, isi, subtitle dan caption; unduh MP4 yang dipilih. Caption posting bisa diedit, disalin atau diunduh sebagai TXT.
+6. Klik **Buat klip baru** untuk video berikutnya. Hasil sebelumnya tersedia lewat menu **Riwayat klip**, termasuk setelah refresh/restart. Daftar memakai area utama, 10 video per halaman, pencarian dan filter status.
+7. Klik **Hapus** pada history yang tidak diperlukan untuk menghapus seluruh berkas pekerjaan dari disk, lalu konfirmasi. Pekerjaan aktif tidak bisa dihapus.
 
 Tidak memerlukan API key atau langganan AI. Whisper berjalan di CPU laptop.
 
 ## Dokumentasi
 
+Lihat [peta dokumentasi](docs/README.md). Developer mulai dari [CONTRIBUTING.md](CONTRIBUTING.md); coding agent membaca [AGENTS.md](AGENTS.md) dan memilih alur kerja melalui [SKILLS.md](SKILLS.md).
+
 | Dokumen | Isi |
 | --- | --- |
+| [Komputer baru](docs/NEW_MACHINE.md) | Alur clone, prasyarat, setup, model dan doctor |
 | [Instalasi dan menjalankan](docs/SETUP.md) | Prasyarat, instalasi manual, launcher, model, pembaruan |
+| [AI caption lokal](docs/LOCAL_AI.md) | Ollama, setup model, privasi dan batas akurasi |
+| [Pengujian](docs/TESTING.md) | Command, cakupan tes dan verifikasi nyata |
+| [Keputusan arsitektur](docs/DECISIONS.md) | Alasan desain dan konsekuensinya |
+| [Usulan pengembangan](docs/ROADMAP.md) | Kandidat pekerjaan berikutnya, bukan fitur tersedia |
 | [Studio Global](docs/GLOBAL.md) | Subtitle/caption Inggris, suara asli, ide konten dan batas kualitas |
 | [Panduan pengguna](docs/USAGE.md) | Input, pilihan, hasil, penyimpanan dan privasi |
 | [Arsitektur](docs/ARCHITECTURE.md) | Pipeline, algoritme pemilihan, subtitle, konkurensi |
@@ -67,11 +86,15 @@ Tidak memerlukan API key atau langganan AI. Whisper berjalan di CPU laptop.
 | [Pengembangan dan verifikasi](docs/DEVELOPMENT.md) | Struktur source, konfigurasi, smoke check, uji lengkap |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Masalah instalasi, YouTube, model, audio, ekspor dan port |
 
+## Rencana pengembangan
+
+[Analisis prioritas](docs/PRODUCT_REVIEW.md), [PRD Tinjau & Perbaiki Klip](docs/prd/KLIP_REVIEW_EDITOR.md), dan [prompt Antigravity](docs/prompts/ANTIGRAVITY_REVIEW_EDITOR.md) menyiapkan usulan tahap berikutnya. Fitur usulan belum tersedia sampai diimplementasikan dan diverifikasi.
+
 ## Kemampuan dan batasan
 
 - MP4 vertikal: 480p (480×854), 720p (720×1280, default), atau 1080p (1080×1920), video H.264, audio AAC, subtitle menyatu dengan gambar.
 - Kandidat diperingkat memakai kata pemancing perhatian, kepadatan percakapan, dan variasi kata. **Belum ada model penilai konteks atau jaminan viral.**
-- Crop tengah tetap; belum ada pelacakan wajah atau editor manual. Resolusi tinggi tidak menambah detail sumber yang rendah dan membutuhkan lebih banyak waktu/ruang.
+- Crop memperkirakan pembicara dari wajah/gerakan mulut, dengan fallback tengah; belum ada editor manual. Resolusi tinggi tidak menambah detail sumber yang rendah dan membutuhkan lebih banyak waktu/ruang.
 - Waktu subtitle per kelompok kata diperkirakan dari segmen Whisper, bukan waktu setiap kata.
 - Satu pekerjaan aktif per proses server. Jumlah kandidat dan durasi hasil dapat lebih kecil dari pilihan.
 - Riwayat tersimpan di server dan bisa dibuka kembali. Belum ada resume proses setelah server berhenti atau antrean permanen.
@@ -79,7 +102,7 @@ Tidak memerlukan API key atau langganan AI. Whisper berjalan di CPU laptop.
 
 ## Data dan akses
 
-Semua video, audio, transkrip, klip, dan model berada di `data/`. Tidak ada pengiriman audio/video ke layanan AI. Unduhan YouTube, model dari Hugging Face, dependensi, serta font Google Fonts tetap memerlukan koneksi ke penyedia masing-masing. Server hanya mendengarkan di `127.0.0.1`, tanpa sistem akun. Ini aplikasi untuk satu pengguna lokal; hosting publik memerlukan arsitektur dan pengamanan tambahan.
+Video, audio, transkrip, klip dan model Whisper berada di `data/`. Model caption berada di penyimpanan Ollama (default `~/.ollama/models`). Tidak ada pengiriman audio/video ke layanan AI. Unduhan YouTube, model dari Hugging Face, dependensi, serta font Google Fonts tetap memerlukan koneksi ke penyedia masing-masing. Server hanya mendengarkan di `127.0.0.1`, tanpa sistem akun. Ini aplikasi untuk satu pengguna lokal; hosting publik memerlukan arsitektur dan pengamanan tambahan.
 
 ## Status verifikasi
 
@@ -90,7 +113,7 @@ Potongan pekerjaan baru mengikuti batas segmen ucapan dan mengutamakan jeda/akhi
 Komponen utama: [Flask](https://flask.palletsprojects.com/), [yt-dlp](https://github.com/yt-dlp/yt-dlp), [faster-whisper](https://github.com/SYSTRAN/faster-whisper), [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg), [OpenCV](https://opencv.org/), dan [PyAV](https://pyav.org/). Lisensi masing-masing komponen mengikuti proyek asalnya; proyek ini belum menetapkan lisensi distribusi sendiri.
 
 
-Caption posting kini berupa rekomendasi satu kalimat singkat, maksimal 16 kata / 121 karakter termasuk elipsis, tanpa CTA dan hashtag otomatis. Rekomendasi mengambil kalimat transkrip yang cukup panjang, lalu membatasi panjangnya; bukan ringkasan semantik AI. Template otomatis versi lama diganti saat dibaca tanpa mengubah file/video lama. Caption hasil edit di browser tetap dipertahankan; tombol **Pakai rekomendasi singkat** mengembalikan rekomendasi pendek.
+Caption baru dirangkum oleh AI lokal dari pembahasan tiap klip, bukan potongan awal transkrip. Target 6–12 kata, maksimal 16 kata / 120 karakter, tanpa CTA/hashtag otomatis. Hasil lama dapat dirangkum lewat **Buat caption AI lokal**. Draft hasil edit meminta konfirmasi sebelum diganti. Lihat [AI lokal](docs/LOCAL_AI.md).
 
 
 **Caption AI lokal:** pasang Ollama dan jalankan `npm run setup:ai` setelah environment Python tersedia. Model Qwen3 1.7B merangkum topik tiap klip menjadi satu kalimat; hasil lama bisa diproses lewat tombol **Buat caption AI lokal**, tanpa ekspor ulang. Lihat [setup dan batas akurasi](docs/LOCAL_AI.md).
