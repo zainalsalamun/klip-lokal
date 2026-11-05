@@ -13,3 +13,23 @@ node_modules/
 
 # Local screenshots and verification artifacts
 outputs/
+
+# Generated runtime and test files
+*.log
+*.pid
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+
+# Optional local environments and downloaded model weights
+venv/
+/models/
+*.gguf
+*.safetensors
+*.onnx
