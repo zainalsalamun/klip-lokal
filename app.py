@@ -9,10 +9,14 @@ import imageio_ffmpeg
 from global_content import TOPICS, IDEAS, SOURCES
 from subtitle_styles import SUBTITLE_STYLES
 from local_caption import summarize, CaptionUnavailable, UnclearTranscript, inference_lock
+import watermark
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
+WATERMARK_ASSETS = DATA / "watermark-assets"
+WATERMARK_ASSETS.mkdir(exist_ok=True)
+WATERMARK_PRESETS = DATA / "watermark-presets.json"
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024**3
@@ -39,9 +43,19 @@ def ensure_clip_ids(job):
             clip["clip_id"] = cid
         seen.add(cid)
         clip.setdefault("metadata_revision", 1)
+        clip.setdefault("caption_revision", clip.get("metadata_revision", 1))
+        clip.setdefault("watermark_revision", 1)
         clip.setdefault("caption_source", "ai_local" if clip.get("caption_status") == "ready" else "extractive" if clip.get("caption") else "none")
         clip.setdefault("caption_language", "id" if audience == "local" else "en")
         clip.setdefault("caption_updated_at", job.get("updated_at") or job.get("created_at"))
+        if "watermark" not in clip:
+            clip["watermark"] = copy.deepcopy(watermark.DEFAULT_WATERMARK_CONFIG)
+        elif isinstance(clip["watermark"], dict):
+            wm = clip["watermark"]
+            if wm.get("type") == "logo" and wm.get("asset_id") and (not wm.get("asset_width") or not wm.get("asset_height")):
+                dims = watermark.get_asset_dimensions(WATERMARK_ASSETS, wm["asset_id"])
+                if dims:
+                    wm["asset_width"], wm["asset_height"] = dims
     return job
 
 def run(args):
@@ -49,11 +63,14 @@ def run(args):
     if result.returncode:
         raise RuntimeError("Pemrosesan video gagal: " + result.stderr[-1200:])
 
-def save_job(jid):
+def write_job_atomic(jid, job_data):
     path = DATA / jid / "job.json"
     temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(jobs[jid], ensure_ascii=False), encoding="utf-8")
+    temporary.write_text(json.dumps(job_data, ensure_ascii=False), encoding="utf-8")
     temporary.replace(path)
+
+def save_job(jid):
+    write_job_atomic(jid, jobs[jid])
 
 
 def update(jid, **values):
@@ -448,18 +465,21 @@ def update_caption(jid, clip_ref):
         ensure_clip_ids(current)
 
         target_clip = None
-        for c in current.get("clips", []):
+        target_index = None
+        for idx, c in enumerate(current.get("clips", [])):
             if c.get("clip_id") == clip_ref:
                 target_clip = c
+                target_index = idx
                 break
         if target_clip is None and clip_ref.isdigit():
             idx = int(clip_ref)
             if 0 <= idx < len(current.get("clips", [])):
                 target_clip = current["clips"][idx]
+                target_index = idx
         if target_clip is None:
             return jsonify(error="Klip tidak ditemukan."), 404
 
-        current_rev = target_clip.get("metadata_revision", 1)
+        current_rev = target_clip.get("caption_revision", target_clip.get("metadata_revision", 1))
         if expected_revision != current_rev:
             return jsonify(
                 error="Konflik revisi caption. Versi server telah diperbarui.",
@@ -470,32 +490,39 @@ def update_caption(jid, clip_ref):
                 server_updated_at=target_clip.get("caption_updated_at")
             ), 409
 
+        # Transactional copy-on-write commit
+        updated_job = copy.deepcopy(current)
+        updated_clip = updated_job["clips"][target_index]
         now = datetime.now(timezone.utc).isoformat()
         new_rev = current_rev + 1
-        target_clip["caption"] = caption
-        target_clip["caption_source"] = "manual"
-        target_clip["caption_language"] = "unverified"
-        target_clip["caption_updated_at"] = now
-        target_clip["metadata_revision"] = new_rev
-        target_clip["caption_note"] = "Edit manual · tersimpan"
-        target_clip["caption_status"] = "ready"
-        current["updated_at"] = now
-        current["schema_version"] = 2
-        jobs[jid] = current
+        updated_clip["caption"] = caption
+        updated_clip["caption_source"] = "manual"
+        updated_clip["caption_language"] = "unverified"
+        updated_clip["caption_updated_at"] = now
+        updated_clip["caption_revision"] = new_rev
+        updated_clip["metadata_revision"] = new_rev
+        updated_clip["caption_note"] = "Edit manual · tersimpan"
+        updated_clip["caption_status"] = "ready"
+        updated_job["updated_at"] = now
+        updated_job["schema_version"] = 2
+
         try:
-            save_job(jid)
-            history_cache.pop(str(folder.resolve()), None)
+            write_job_atomic(jid, updated_job)
         except OSError as exc:
             return jsonify(error="Gagal menyimpan ke disk: " + str(exc)), 500
 
+        jobs[jid] = updated_job
+        history_cache.pop(str(folder.resolve()), None)
+
         return jsonify(
-            clip_id=target_clip["clip_id"],
-            caption=target_clip["caption"],
-            caption_source=target_clip["caption_source"],
-            caption_language=target_clip["caption_language"],
-            caption_updated_at=target_clip["caption_updated_at"],
-            metadata_revision=target_clip["metadata_revision"],
-            caption_note=target_clip["caption_note"]
+            clip_id=updated_clip["clip_id"],
+            caption=updated_clip["caption"],
+            caption_source=updated_clip["caption_source"],
+            caption_language=updated_clip["caption_language"],
+            caption_updated_at=updated_clip["caption_updated_at"],
+            metadata_revision=updated_clip["metadata_revision"],
+            caption_revision=updated_clip["caption_revision"],
+            caption_note=updated_clip["caption_note"]
         ), 200
 
 
@@ -521,7 +548,28 @@ def _handle_generate_caption(jid, clip_ref):
         return jsonify(error="Klip tidak ditemukan."), 404
 
     target_clip_id = target_clip["clip_id"]
-    initial_revision = target_clip.get("metadata_revision", 1)
+    initial_revision = target_clip.get("caption_revision", target_clip.get("metadata_revision", 1))
+
+    expected_revision = None
+    if request.is_json:
+        try:
+            req_data = request.get_json(silent=True)
+            if isinstance(req_data, dict) and "expected_revision" in req_data:
+                exp_rev = req_data["expected_revision"]
+                if not isinstance(exp_rev, int) or isinstance(exp_rev, bool) or exp_rev < 1:
+                    return jsonify(error="expected_revision harus berupa integer positif."), 400
+                expected_revision = exp_rev
+        except Exception:
+            pass
+
+    if expected_revision is not None and expected_revision != initial_revision:
+        return jsonify(
+            error="Konflik revisi caption. Versi server telah diperbarui.",
+            conflict=True,
+            current_revision=initial_revision,
+            current_caption=target_clip.get("caption", ""),
+            caption_source=target_clip.get("caption_source", "none")
+        ), 409
 
     with lock:
         if any(not item.get("done") for item in jobs.values()):
@@ -542,40 +590,54 @@ def _handle_generate_caption(jid, clip_ref):
         ensure_clip_ids(current)
 
         current_clip = None
-        for c in current.get("clips", []):
+        current_index = None
+        for idx, c in enumerate(current.get("clips", [])):
             if c.get("clip_id") == target_clip_id:
                 current_clip = c
+                current_index = idx
                 break
         if current_clip is None and target_index is not None and 0 <= target_index < len(current.get("clips", [])):
             current_clip = current["clips"][target_index]
+            current_index = target_index
         if current_clip is None:
             return jsonify(error="Klip tidak ditemukan."), 404
 
-        if current_clip.get("metadata_revision", 1) != initial_revision or current_clip.get("caption_source") == "manual":
+        current_cap_rev = current_clip.get("caption_revision", current_clip.get("metadata_revision", 1))
+        if current_cap_rev != initial_revision:
+            msg = "Caption telah diperbarui secara manual saat AI sedang merangkum. Edit manual dipertahankan." if current_clip.get("caption_source") == "manual" else "Caption telah diperbarui saat AI sedang merangkum. Perubahan terbaru dipertahankan."
             return jsonify(
-                error="Caption telah diperbarui secara manual saat AI sedang merangkum. Edit manual dipertahankan.",
+                error=msg,
                 conflict=True,
-                current_revision=current_clip.get("metadata_revision", 1),
+                current_revision=current_cap_rev,
                 current_caption=current_clip.get("caption", ""),
                 caption_source=current_clip.get("caption_source", "manual")
             ), 409
 
+        updated_job = copy.deepcopy(current)
+        target_to_update = updated_job["clips"][current_index]
         now = datetime.now(timezone.utc).isoformat()
-        current_clip.update(result)
-        current_clip["caption_source"] = "ai_local"
-        current_clip["caption_updated_at"] = now
-        current_clip["metadata_revision"] = current_clip.get("metadata_revision", 1) + 1
-        current["updated_at"] = now
-        current["schema_version"] = 2
-        jobs[jid] = current
-        save_job(jid)
+        target_to_update.update(result)
+        target_to_update["caption_source"] = "ai_local"
+        target_to_update["caption_updated_at"] = now
+        new_rev = current_cap_rev + 1
+        target_to_update["caption_revision"] = new_rev
+        target_to_update["metadata_revision"] = new_rev
+        updated_job["updated_at"] = now
+        updated_job["schema_version"] = 2
+
+        try:
+            write_job_atomic(jid, updated_job)
+        except OSError as exc:
+            return jsonify(error="Gagal menyimpan ke disk: " + str(exc)), 500
+
+        jobs[jid] = updated_job
         history_cache.pop(str(folder.resolve()), None)
 
     return jsonify({
         **result,
-        "clip_id": current_clip["clip_id"],
-        "metadata_revision": current_clip["metadata_revision"],
-        "caption_updated_at": current_clip["caption_updated_at"]
+        "clip_id": target_to_update["clip_id"],
+        "metadata_revision": target_to_update["metadata_revision"],
+        "caption_updated_at": target_to_update["caption_updated_at"]
     })
 
 
@@ -587,6 +649,233 @@ def generate_caption(jid, index):
 @app.post("/api/jobs/<jid>/clips/<clip_ref>/caption")
 def generate_caption_ref(jid, clip_ref):
     return _handle_generate_caption(jid, clip_ref)
+
+
+@app.patch("/api/jobs/<jid>/clips/<clip_ref>/watermark")
+def update_watermark(jid, clip_ref):
+    if not re.fullmatch(r"[a-f0-9]{32}", jid):
+        return jsonify(error="Riwayat tidak ditemukan."), 404
+    job = read_job(jid)
+    if not job:
+        return jsonify(error="Riwayat tidak ditemukan."), 404
+    folder = DATA / jid
+
+    data = request.get_json(silent=True) or {}
+    if "watermark" not in data:
+        return jsonify(error="Field 'watermark' wajib diisi."), 400
+
+    expected_revision = data.get("expected_revision")
+    if expected_revision is not None:
+        try:
+            expected_revision = int(expected_revision)
+        except (ValueError, TypeError):
+            return jsonify(error="expected_revision harus berupa angka bulat."), 400
+
+    try:
+        validated_config = watermark.validate_watermark_config(data["watermark"], WATERMARK_ASSETS)
+    except watermark.WatermarkError as exc:
+        return jsonify(error=str(exc)), 400
+
+    with lock:
+        current = jobs.get(jid, job)
+        ensure_clip_ids(current)
+
+        target_clip = None
+        target_index = None
+        for idx, c in enumerate(current.get("clips", [])):
+            if c.get("clip_id") == clip_ref:
+                target_clip = c
+                target_index = idx
+                break
+        if target_clip is None and clip_ref.isdigit():
+            idx = int(clip_ref)
+            if 0 <= idx < len(current.get("clips", [])):
+                target_clip = current["clips"][idx]
+                target_index = idx
+        if target_clip is None:
+            return jsonify(error="Klip tidak ditemukan."), 404
+
+        current_rev = target_clip.get("watermark_revision", 1)
+        if expected_revision is not None and expected_revision != current_rev:
+            return jsonify(
+                error="Konflik revisi watermark. Versi server telah diperbarui.",
+                conflict=True,
+                current_revision=current_rev,
+                server_watermark=target_clip.get("watermark"),
+                server_updated_at=target_clip.get("watermark_updated_at")
+            ), 409
+
+        # Transactional copy-on-write commit
+        updated_job = copy.deepcopy(current)
+        updated_clip = updated_job["clips"][target_index]
+        now = datetime.now(timezone.utc).isoformat()
+        new_rev = current_rev + 1
+        updated_clip["watermark"] = validated_config
+        updated_clip["watermark_updated_at"] = now
+        updated_clip["watermark_revision"] = new_rev
+        updated_job["updated_at"] = now
+        updated_job["schema_version"] = 2
+
+        try:
+            write_job_atomic(jid, updated_job)
+        except OSError as exc:
+            return jsonify(error="Gagal menyimpan ke disk: " + str(exc)), 500
+
+        jobs[jid] = updated_job
+        history_cache.pop(str(folder.resolve()), None)
+
+        clash, clash_msg = watermark.detect_subtitle_clash(
+            validated_config,
+            canvas_w=720,
+            canvas_h=1280,
+            asset_w=validated_config.get("asset_width"),
+            asset_h=validated_config.get("asset_height")
+        )
+
+        return jsonify(
+            clip_id=updated_clip["clip_id"],
+            watermark=updated_clip["watermark"],
+            watermark_revision=updated_clip["watermark_revision"],
+            metadata_revision=updated_clip.get("metadata_revision", 1),
+            clash_detected=clash,
+            clash_message=clash_msg,
+            watermark_updated_at=updated_clip["watermark_updated_at"]
+        ), 200
+
+
+@app.post("/api/watermark-assets")
+def upload_watermark_asset():
+    file = request.files.get("file") or request.files.get("logo")
+    if not file or not file.filename:
+        return jsonify(error="File logo harus diunggah."), 400
+
+    try:
+        file_bytes = file.read()
+    except Exception as exc:
+        return jsonify(error="Gagal membaca file unggahan: " + str(exc)), 400
+
+    try:
+        asset_info = watermark.validate_and_save_logo(file_bytes, WATERMARK_ASSETS)
+    except watermark.PayloadTooLargeError as exc:
+        return jsonify(error=str(exc)), 413
+    except watermark.WatermarkError as exc:
+        return jsonify(error=str(exc)), 400
+    except Exception as exc:
+        return jsonify(error="Gagal memproses gambar logo: " + str(exc)), 400
+
+    return jsonify(asset_info), 201
+
+
+@app.get("/api/watermark-assets/<asset_id>/preview")
+def preview_watermark_asset(asset_id):
+    if not re.fullmatch(r"[a-f0-9]{16,64}", asset_id):
+        return jsonify(error="ID aset tidak valid."), 404
+
+    png_file = WATERMARK_ASSETS / f"{asset_id}.png"
+    jpg_file = WATERMARK_ASSETS / f"{asset_id}.jpg"
+
+    if png_file.exists():
+        return send_from_directory(WATERMARK_ASSETS, f"{asset_id}.png", mimetype="image/png")
+    elif jpg_file.exists():
+        return send_from_directory(WATERMARK_ASSETS, f"{asset_id}.jpg", mimetype="image/jpeg")
+    else:
+        return jsonify(error="Aset logo tidak ditemukan."), 404
+
+
+@app.get("/api/watermark-presets")
+def get_watermark_presets():
+    with lock:
+        presets = watermark.load_presets(WATERMARK_PRESETS)
+    return jsonify(presets=presets), 200
+
+
+@app.post("/api/watermark-presets")
+def create_watermark_preset():
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("name", "")).strip()
+    if not name or len(name) > watermark.MAX_PRESET_NAME_LENGTH:
+        return jsonify(error=f"Nama preset harus diisi (maksimal {watermark.MAX_PRESET_NAME_LENGTH} karakter)."), 400
+
+    try:
+        config = watermark.validate_watermark_config(data.get("configuration", {}), WATERMARK_ASSETS)
+    except watermark.WatermarkError as exc:
+        return jsonify(error=str(exc)), 400
+
+    preset_id = uuid.uuid4().hex[:16]
+    now = datetime.now(timezone.utc).isoformat()
+    new_preset = {
+        "preset_id": preset_id,
+        "revision": 1,
+        "name": name,
+        "configuration": config,
+        "created_at": now,
+        "updated_at": now
+    }
+
+    with lock:
+        presets = watermark.load_presets(WATERMARK_PRESETS)
+        presets.append(new_preset)
+        try:
+            watermark.save_presets_atomic(WATERMARK_PRESETS, presets)
+        except OSError as exc:
+            return jsonify(error="Gagal menyimpan preset ke disk: " + str(exc)), 500
+
+    return jsonify(new_preset), 201
+
+
+@app.patch("/api/watermark-presets/<preset_id>")
+def update_watermark_preset(preset_id):
+    if not re.fullmatch(r"[a-f0-9]{16,64}", preset_id):
+        return jsonify(error="ID preset tidak valid."), 404
+
+    data = request.get_json(silent=True) or {}
+    expected_revision = data.get("expected_revision")
+    if expected_revision is not None:
+        try:
+            expected_revision = int(expected_revision)
+        except (ValueError, TypeError):
+            return jsonify(error="expected_revision harus berupa angka bulat."), 400
+
+    with lock:
+        presets = watermark.load_presets(WATERMARK_PRESETS)
+        target_preset = None
+        for p in presets:
+            if p.get("preset_id") == preset_id:
+                target_preset = p
+                break
+        if not target_preset:
+            return jsonify(error="Preset tidak ditemukan."), 404
+
+        current_rev = target_preset.get("revision", 1)
+        if expected_revision is not None and expected_revision != current_rev:
+            return jsonify(
+                error="Konflik revisi: Preset telah diperbarui di sesi lain.",
+                conflict=True,
+                current_revision=current_rev
+            ), 409
+
+        if "name" in data:
+            new_name = str(data["name"]).strip()
+            if not new_name or len(new_name) > watermark.MAX_PRESET_NAME_LENGTH:
+                return jsonify(error=f"Nama preset harus diisi (maksimal {watermark.MAX_PRESET_NAME_LENGTH} karakter)."), 400
+            target_preset["name"] = new_name
+
+        if "configuration" in data:
+            try:
+                new_config = watermark.validate_watermark_config(data["configuration"], WATERMARK_ASSETS)
+            except watermark.WatermarkError as exc:
+                return jsonify(error=str(exc)), 400
+            target_preset["configuration"] = new_config
+
+        target_preset["revision"] = current_rev + 1
+        target_preset["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        try:
+            watermark.save_presets_atomic(WATERMARK_PRESETS, presets)
+        except OSError as exc:
+            return jsonify(error="Gagal menyimpan preset ke disk: " + str(exc)), 500
+
+    return jsonify(target_preset), 200
 
 
 @app.delete("/api/jobs/<jid>")
