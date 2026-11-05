@@ -128,7 +128,7 @@ function formatSaveTime(isoString) {
   return ' (' + d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}) + ')';
 }
 function hasUnsavedCaptionEdits() {
-  return Boolean(document.querySelector('.caption-editor.has-unsaved'));
+  return Boolean(document.querySelector('.caption-editor.has-unsaved, .watermark-editor.has-unsaved'));
 }
 window.addEventListener('beforeunload', event => {
   if (hasUnsavedCaptionEdits()) {
@@ -140,7 +140,8 @@ function captionEditor(clip, index, jobId, audience) {
   const box = document.createElement('section'); box.className = 'caption-editor';
   const clipId = clip.clip_id || String(index);
   let savedCaption = clip.caption ?? (clip.text ? makeCaption(clip.text, audience) : '');
-  let currentRevision = clip.metadata_revision || 1;
+  let currentRevision = clip.caption_revision || clip.metadata_revision || 1;
+  let isBusy = false;
 
   const header = document.createElement('div'); header.className = 'caption-editor-header';
   const label = document.createElement('label'); label.textContent = 'Caption posting'; label.htmlFor = 'caption-' + clipId;
@@ -148,12 +149,29 @@ function captionEditor(clip, index, jobId, audience) {
   targetBadge.textContent = audience === 'global_en' ? 'Target AI: English' : 'Target AI: Indonesia';
   header.append(label, targetBadge);
 
+  const textarea = document.createElement('textarea'); textarea.id = label.htmlFor; textarea.rows = 4;
+  textarea.maxLength = 2000; textarea.placeholder = 'Buat caption AI dari pembahasan klip, atau tulis sendiri…'; textarea.value = savedCaption;
+
+  const saveBtn = document.createElement('button'); saveBtn.type = 'button'; saveBtn.className = 'btn-save-caption'; saveBtn.textContent = 'Simpan caption'; saveBtn.disabled = true;
+  const generate = document.createElement('button'); generate.type = 'button'; generate.className = 'btn-ai-caption'; generate.textContent = 'Buat caption AI lokal';
+
   const statusBadge = document.createElement('div'); statusBadge.className = 'caption-status-badge';
   statusBadge.setAttribute('role', 'status'); statusBadge.setAttribute('aria-live', 'polite');
 
+  function isDirty() {
+    return textarea.value !== savedCaption;
+  }
+  function syncDirtyState() {
+    const dirty = isDirty();
+    box.classList.toggle('has-unsaved', dirty);
+    saveBtn.disabled = isBusy || !dirty;
+    generate.disabled = isBusy;
+    textarea.disabled = isBusy;
+  }
+
   function updateStatus(state, msg) {
     statusBadge.className = 'caption-status-badge state-' + state;
-    box.classList.toggle('has-unsaved', state === 'modified');
+    syncDirtyState();
     if (msg) { statusBadge.textContent = msg; return; }
     if (state === 'saved') {
       if (clip.caption_source === 'manual') {
@@ -195,9 +213,6 @@ function captionEditor(clip, index, jobId, audience) {
   const draftBanner = document.createElement('div'); draftBanner.className = 'caption-draft-banner'; draftBanner.hidden = true;
   const conflictBanner = document.createElement('div'); conflictBanner.className = 'caption-conflict-banner'; conflictBanner.hidden = true;
 
-  const textarea = document.createElement('textarea'); textarea.id = label.htmlFor; textarea.rows = 4;
-  textarea.maxLength = 2000; textarea.placeholder = 'Buat caption AI dari pembahasan klip, atau tulis sendiri…'; textarea.value = savedCaption;
-
   const metaBar = document.createElement('div'); metaBar.className = 'caption-meta-bar';
   const charDisplay = document.createElement('span'); charDisplay.className = 'caption-char-count';
   function updateCharCount() {
@@ -209,18 +224,14 @@ function captionEditor(clip, index, jobId, audience) {
   updateCharCount();
 
   const actions = document.createElement('div'); actions.className = 'caption-actions';
-  const saveBtn = document.createElement('button'); saveBtn.type = 'button'; saveBtn.className = 'btn-save-caption'; saveBtn.textContent = 'Simpan caption'; saveBtn.disabled = true;
   const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn-copy-caption'; copy.textContent = 'Salin caption';
   const saveTxt = document.createElement('button'); saveTxt.type = 'button'; saveTxt.className = 'btn-download-txt'; saveTxt.textContent = 'Unduh TXT';
-  const generate = document.createElement('button'); generate.type = 'button'; generate.className = 'btn-ai-caption'; generate.textContent = 'Buat caption AI lokal';
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn-cancel-caption'; cancel.textContent = 'Batal'; cancel.hidden = true;
   const feedback = document.createElement('span'); feedback.className = 'caption-feedback'; feedback.setAttribute('role', 'status');
 
   textarea.addEventListener('input', () => {
     updateCharCount();
-    const isModified = textarea.value !== savedCaption;
-    saveBtn.disabled = !isModified;
-    if (isModified) {
+    if (isDirty()) {
       updateStatus('modified');
       conflictBanner.hidden = true;
     } else {
@@ -238,7 +249,6 @@ function captionEditor(clip, index, jobId, audience) {
       restoreBtn.addEventListener('click', () => {
         textarea.value = legacyDraft;
         updateCharCount();
-        saveBtn.disabled = false;
         updateStatus('modified', '● Draft browser dipulihkan (belum disimpan ke server)');
         draftBanner.hidden = true;
         feedback.textContent = 'Draft browser dimuat. Klik "Simpan caption" untuk menyimpannya ke server.';
@@ -258,7 +268,9 @@ function captionEditor(clip, index, jobId, audience) {
   }
 
   saveBtn.addEventListener('click', async () => {
-    saveBtn.disabled = true; generate.disabled = true; textarea.disabled = true;
+    if (isBusy || !isDirty()) return;
+    isBusy = true;
+    syncDirtyState();
     updateStatus('saving'); feedback.textContent = ''; feedback.classList.remove('is-error');
     try {
       const res = await api('/api/jobs/' + encodeURIComponent(jobId) + '/clips/' + encodeURIComponent(clipId) + '/caption', {
@@ -267,11 +279,14 @@ function captionEditor(clip, index, jobId, audience) {
         body: JSON.stringify({caption: textarea.value, expected_revision: currentRevision})
       });
       clip.caption = res.caption; clip.caption_source = res.caption_source; clip.caption_language = res.caption_language;
-      clip.caption_updated_at = res.caption_updated_at; clip.metadata_revision = res.metadata_revision;
-      currentRevision = res.metadata_revision; savedCaption = res.caption;
+      clip.caption_updated_at = res.caption_updated_at;
+      currentRevision = res.caption_revision || res.metadata_revision || (currentRevision + 1);
+      clip.caption_revision = currentRevision;
+      clip.metadata_revision = res.metadata_revision || currentRevision;
+      savedCaption = res.caption;
       try { localStorage.removeItem(legacyKey); } catch (_) {}
       legacyDraft = null; draftBanner.hidden = true; conflictBanner.hidden = true;
-      updateNote(); updateStatus('saved'); saveBtn.disabled = true;
+      updateNote(); updateStatus('saved');
       feedback.textContent = 'Caption manual berhasil disimpan ke server.';
     } catch (err) {
       if (err.data && err.data.conflict) {
@@ -281,10 +296,10 @@ function captionEditor(clip, index, jobId, audience) {
         updateStatus('error');
         feedback.textContent = err instanceof ConnectionError ? connectionMessage : (err.message || 'Gagal menyimpan caption.');
         feedback.classList.add('is-error');
-        saveBtn.disabled = false;
       }
     } finally {
-      generate.disabled = false; textarea.disabled = false;
+      isBusy = false;
+      syncDirtyState();
     }
   });
 
@@ -299,13 +314,13 @@ function captionEditor(clip, index, jobId, audience) {
       textarea.value = data.server_caption || ''; savedCaption = data.server_caption || '';
       currentRevision = data.current_revision; clip.caption = data.server_caption;
       clip.metadata_revision = data.current_revision; clip.caption_source = data.server_source || 'manual';
-      updateCharCount(); updateNote(); updateStatus('saved'); saveBtn.disabled = true; conflictBanner.hidden = true;
+      updateCharCount(); updateNote(); updateStatus('saved'); conflictBanner.hidden = true;
       feedback.textContent = 'Versi server dimuat.';
     });
     const overwriteBtn = document.createElement('button'); overwriteBtn.type = 'button';
     overwriteBtn.textContent = 'Timpa dengan teks ini';
     overwriteBtn.addEventListener('click', () => {
-      currentRevision = data.current_revision; conflictBanner.hidden = true; saveBtn.disabled = false; saveBtn.click();
+      currentRevision = data.current_revision; conflictBanner.hidden = true; saveBtn.click();
     });
     actionsDiv.append(loadServerBtn, overwriteBtn);
     conflictBanner.append(msg, actionsDiv);
@@ -338,22 +353,30 @@ function captionEditor(clip, index, jobId, audience) {
   });
 
   generate.addEventListener('click', async () => {
-    const isModified = textarea.value !== savedCaption;
+    const isModified = isDirty();
     const hasCustomText = textarea.value.trim().length > 0;
     if (!replaceConfirmed && (isModified || hasCustomText)) {
       replaceConfirmed = true; cancel.hidden = false; generate.textContent = 'Ganti teks & buat AI';
       feedback.textContent = 'Teks caption saat ini akan diganti oleh AI. Klik sekali lagi untuk melanjutkan, atau pilih Batal.';
       return;
     }
+    if (isBusy) return;
+    isBusy = true;
     replaceConfirmed = false; cancel.hidden = true; feedback.classList.remove('is-error');
-    generate.disabled = true; saveBtn.disabled = true; textarea.disabled = true;
+    syncDirtyState();
     generate.textContent = 'Merangkum pembahasan…'; feedback.textContent = 'AI berjalan di laptop; proses pertama bisa lebih lama.';
 
     try {
-      const result = await api('/api/jobs/' + encodeURIComponent(jobId) + '/clips/' + encodeURIComponent(clipId) + '/caption', {method: 'POST'});
+      const result = await api('/api/jobs/' + encodeURIComponent(jobId) + '/clips/' + encodeURIComponent(clipId) + '/caption', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({expected_revision: currentRevision})
+      });
       Object.assign(clip, result); textarea.value = result.caption; savedCaption = result.caption;
-      currentRevision = result.metadata_revision || (currentRevision + 1); clip.metadata_revision = currentRevision;
-      updateCharCount(); updateNote(); updateStatus('saved'); saveBtn.disabled = true;
+      currentRevision = result.caption_revision || result.metadata_revision || (currentRevision + 1);
+      clip.caption_revision = currentRevision;
+      clip.metadata_revision = result.metadata_revision || currentRevision;
+      updateCharCount(); updateNote(); updateStatus('saved');
       try { localStorage.removeItem(legacyKey); } catch (_) {}
       legacyDraft = null; draftBanner.hidden = true; conflictBanner.hidden = true;
       feedback.textContent = 'Caption dibuat dari pembahasan klip oleh AI lokal. Tinjau sebelum posting.';
@@ -365,12 +388,611 @@ function captionEditor(clip, index, jobId, audience) {
       }
       feedback.classList.add('is-error');
     } finally {
-      generate.disabled = false; textarea.disabled = false; generate.textContent = 'Buat caption AI lokal';
+      isBusy = false;
+      generate.textContent = 'Buat caption AI lokal';
+      syncDirtyState();
     }
   });
 
   actions.append(saveBtn, copy, saveTxt, generate, cancel);
   box.append(header, statusBadge, draftBanner, conflictBanner, textarea, metaBar, actions, feedback);
+  return box;
+}
+function watermarkEditor(clip, index, jobId) {
+  const box = document.createElement('section');
+  box.className = 'watermark-editor';
+  const clipId = clip.clip_id || String(index);
+
+  const defaultWm = {
+    enabled: false,
+    type: 'text',
+    text: '',
+    asset_id: null,
+    asset_width: null,
+    asset_height: null,
+    position: 'top_right',
+    width_ratio: 0.15,
+    opacity: 0.70,
+    margin_ratio: 0.03,
+    text_color: 'white',
+    text_treatment: 'outline'
+  };
+
+  let savedWm = clip.watermark ? JSON.parse(JSON.stringify(clip.watermark)) : JSON.parse(JSON.stringify(defaultWm));
+  let currentWm = JSON.parse(JSON.stringify(savedWm));
+  let currentRevision = clip.watermark_revision || 1;
+  let isBusy = false;
+  let currentLogoLoadId = 0;
+
+  const header = document.createElement('div'); header.className = 'watermark-editor-header';
+  const titleLabel = document.createElement('label'); titleLabel.textContent = 'Watermark video';
+  const toggleWrap = document.createElement('label'); toggleWrap.className = 'watermark-toggle-wrap';
+  const toggleCheckbox = document.createElement('input'); toggleCheckbox.type = 'checkbox';
+  toggleCheckbox.checked = Boolean(currentWm.enabled);
+  const toggleText = document.createElement('span'); toggleText.textContent = 'Aktifkan watermark';
+  toggleWrap.append(toggleCheckbox, toggleText);
+  header.append(titleLabel, toggleWrap);
+
+  const statusBadge = document.createElement('div'); statusBadge.className = 'caption-status-badge';
+  statusBadge.setAttribute('role', 'status'); statusBadge.setAttribute('aria-live', 'polite');
+
+  const saveBtn = document.createElement('button'); saveBtn.type = 'button'; saveBtn.className = 'btn-save-watermark';
+  saveBtn.textContent = 'Simpan watermark'; saveBtn.disabled = true;
+
+  function isDirty() {
+    return JSON.stringify(currentWm) !== JSON.stringify(savedWm);
+  }
+
+  function syncDirtyState() {
+    const dirty = isDirty();
+    box.classList.toggle('has-unsaved', dirty);
+    saveBtn.disabled = isBusy || !dirty;
+  }
+
+  function updateStatus(state, msg) {
+    statusBadge.className = 'caption-status-badge state-' + state;
+    syncDirtyState();
+    if (msg) { statusBadge.textContent = msg; return; }
+    if (state === 'saved') {
+      if (currentWm.enabled) {
+        const typeLabel = currentWm.type === 'logo' ? 'Logo' : 'Teks ("' + (currentWm.text || 'kosong') + '")';
+        statusBadge.textContent = '✓ Tersimpan di draft · ' + typeLabel;
+      } else {
+        statusBadge.textContent = 'Watermark nonaktif';
+      }
+    } else if (state === 'modified') {
+      statusBadge.textContent = '● Perubahan watermark belum disimpan';
+    } else if (state === 'saving') {
+      statusBadge.textContent = 'Menyimpan watermark ke server…';
+    } else if (state === 'conflict') {
+      statusBadge.textContent = '⚠ Konflik: Watermark di server telah diperbarui';
+    } else if (state === 'error') {
+      statusBadge.textContent = '⚠ Gagal menyimpan watermark';
+    }
+  }
+
+  const conflictBanner = document.createElement('div'); conflictBanner.className = 'caption-conflict-banner'; conflictBanner.hidden = true;
+
+  const body = document.createElement('div'); body.className = 'watermark-body';
+  body.hidden = !currentWm.enabled;
+
+  const typeField = document.createElement('div'); typeField.className = 'watermark-field';
+  const typeLabel = document.createElement('label'); typeLabel.textContent = 'Tipe watermark';
+  const typeSegmented = document.createElement('div'); typeSegmented.className = 'watermark-segmented';
+  const btnTypeText = document.createElement('button'); btnTypeText.type = 'button'; btnTypeText.textContent = 'Teks';
+  const btnTypeLogo = document.createElement('button'); btnTypeLogo.type = 'button'; btnTypeLogo.textContent = 'Logo (gambar)';
+  typeSegmented.append(btnTypeText, btnTypeLogo);
+  typeField.append(typeLabel, typeSegmented);
+
+  const textPanel = document.createElement('div'); textPanel.className = 'watermark-field';
+  const textInputLabel = document.createElement('label'); textInputLabel.textContent = 'Teks watermark (maks. 60 karakter)';
+  const textInput = document.createElement('input'); textInput.type = 'text'; textInput.maxLength = 60;
+  textInput.placeholder = 'Tulis nama brand atau @handle…'; textInput.value = currentWm.text || '';
+
+  const textMetaRow = document.createElement('div'); textMetaRow.className = 'watermark-field-row';
+  const colorWrap = document.createElement('div');
+  const colorLabel = document.createElement('label'); colorLabel.textContent = 'Warna teks';
+  const colorSelect = document.createElement('select');
+  colorSelect.innerHTML = '<option value="white">Putih</option><option value="black">Hitam</option>';
+  colorSelect.value = currentWm.text_color || 'white';
+  colorWrap.append(colorLabel, colorSelect);
+
+  const treatWrap = document.createElement('div');
+  const treatLabel = document.createElement('label'); treatLabel.textContent = 'Gaya teks';
+  const treatSelect = document.createElement('select');
+  treatSelect.innerHTML = '<option value="outline">Outline (garis tepi)</option><option value="panel">Panel latar</option><option value="none">Polos</option>';
+  treatSelect.value = currentWm.text_treatment || 'outline';
+  treatWrap.append(treatLabel, treatSelect);
+  textMetaRow.append(colorWrap, treatWrap);
+  textPanel.append(textInputLabel, textInput, textMetaRow);
+
+  const logoPanel = document.createElement('div'); logoPanel.className = 'watermark-field'; logoPanel.hidden = true;
+  const logoInputLabel = document.createElement('label'); logoInputLabel.textContent = 'Unggah logo (PNG transparan / JPG, maks. 5 MiB)';
+  const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = '.png,.jpg,.jpeg';
+  const uploadFeedback = document.createElement('small'); uploadFeedback.className = 'watermark-note';
+  const logoThumbWrap = document.createElement('div'); logoThumbWrap.className = 'watermark-logo-preview'; logoThumbWrap.hidden = !currentWm.asset_id;
+  const logoThumb = document.createElement('img'); logoThumb.className = 'watermark-logo-thumb';
+  if (currentWm.asset_id) logoThumb.src = '/api/watermark-assets/' + encodeURIComponent(currentWm.asset_id) + '/preview';
+  const logoInfo = document.createElement('span'); logoInfo.style.fontSize = '12px'; logoInfo.textContent = currentWm.asset_id ? 'Logo tersimpan' : '';
+  logoThumbWrap.append(logoThumb, logoInfo);
+  logoPanel.append(logoInputLabel, fileInput, uploadFeedback, logoThumbWrap);
+
+  const posField = document.createElement('div'); posField.className = 'watermark-field';
+  const posLabel = document.createElement('label'); posLabel.textContent = 'Posisi overlay (9 anchor)';
+  const posGrid = document.createElement('div'); posGrid.className = 'watermark-grid-9';
+  const positions = [
+    ['top_left', '↖ Kiri'], ['top_center', '↑ Tengah'], ['top_right', '↗ Kanan'],
+    ['center_left', '← Kiri'], ['center', '• Tengah'], ['center_right', '→ Kanan'],
+    ['bottom_left', '↙ Kiri'], ['bottom_center', '↓ Tengah'], ['bottom_right', '↘ Kanan']
+  ];
+  const posButtons = {};
+  positions.forEach(([pKey, pLabel]) => {
+    const btn = document.createElement('button'); btn.type = 'button'; btn.textContent = pLabel;
+    btn.dataset.pos = pKey;
+    posGrid.append(btn);
+    posButtons[pKey] = btn;
+    btn.addEventListener('click', () => {
+      currentWm.position = pKey;
+      syncPositionUI();
+      updatePreview();
+      updateStatus('modified');
+    });
+  });
+  posField.append(posLabel, posGrid);
+
+  const slidersField = document.createElement('div'); slidersField.className = 'watermark-field';
+  const wWrap = document.createElement('div'); wWrap.className = 'watermark-slider-wrap';
+  const wLabel = document.createElement('label'); wLabel.textContent = 'Lebar'; wLabel.style.minWidth = '50px';
+  const wSlider = document.createElement('input'); wSlider.type = 'range'; wSlider.min = '5'; wSlider.max = '30'; wSlider.step = '1';
+  wSlider.value = String(Math.round((currentWm.width_ratio || 0.15) * 100));
+  const wVal = document.createElement('span'); wVal.textContent = wSlider.value + '%';
+  wWrap.append(wLabel, wSlider, wVal);
+
+  const oWrap = document.createElement('div'); oWrap.className = 'watermark-slider-wrap';
+  const oLabel = document.createElement('label'); oLabel.textContent = 'Opasitas'; oLabel.style.minWidth = '50px';
+  const oSlider = document.createElement('input'); oSlider.type = 'range'; oSlider.min = '10'; oSlider.max = '100'; oSlider.step = '5';
+  oSlider.value = String(Math.round((currentWm.opacity || 0.70) * 100));
+  const oVal = document.createElement('span'); oVal.textContent = oSlider.value + '%';
+  oWrap.append(oLabel, oSlider, oVal);
+
+  const mWrap = document.createElement('div'); mWrap.className = 'watermark-slider-wrap';
+  const mLabel = document.createElement('label'); mLabel.textContent = 'Margin'; mLabel.style.minWidth = '50px';
+  const mSlider = document.createElement('input'); mSlider.type = 'range'; mSlider.min = '0'; mSlider.max = '10'; mSlider.step = '1';
+  mSlider.value = String(Math.round((currentWm.margin_ratio || 0.03) * 100));
+  const mVal = document.createElement('span'); mVal.textContent = mSlider.value + '%';
+  mWrap.append(mLabel, mSlider, mVal);
+  slidersField.append(wWrap, oWrap, mWrap);
+
+  const previewArea = document.createElement('div'); previewArea.className = 'watermark-preview-area';
+  const previewCanvas = document.createElement('div'); previewCanvas.className = 'watermark-preview-canvas';
+  const previewOverlay = document.createElement('div'); previewOverlay.className = 'watermark-preview-overlay';
+  const previewSubtitleZone = document.createElement('div'); previewSubtitleZone.className = 'watermark-preview-subtitle-zone';
+  previewSubtitleZone.textContent = 'Area Subtitle (bawah)';
+  previewCanvas.append(previewOverlay, previewSubtitleZone);
+
+  const previewSide = document.createElement('div'); previewSide.style.flex = '1';
+  const clashWarning = document.createElement('div'); clashWarning.className = 'watermark-clash-warning'; clashWarning.hidden = true;
+  clashWarning.textContent = '⚠ Perhatian: Posisi bawah berpotensi menutupi teks subtitle video.';
+  const previewNote = document.createElement('p'); previewNote.className = 'watermark-note';
+  previewNote.textContent = 'Ilustrasi preview 9:16. Posisi dan skala dinormalisasi otomatis pada kanvas ekspor (480p / 720p / 1080p).';
+  previewSide.append(clashWarning, previewNote);
+  previewArea.append(previewCanvas, previewSide);
+
+  const presetField = document.createElement('div'); presetField.className = 'watermark-field';
+  const presetLabel = document.createElement('label'); presetLabel.textContent = 'Preset watermark lokal';
+  const presetRow = document.createElement('div'); presetRow.className = 'watermark-actions';
+  const presetSelect = document.createElement('select'); presetSelect.style.flex = '1';
+  presetSelect.innerHTML = '<option value="">-- Pilih preset tersimpan --</option>';
+  const btnApplyPreset = document.createElement('button'); btnApplyPreset.type = 'button'; btnApplyPreset.textContent = 'Pakai preset';
+  const btnSavePreset = document.createElement('button'); btnSavePreset.type = 'button'; btnSavePreset.textContent = 'Simpan preset baru';
+  presetRow.append(presetSelect, btnApplyPreset, btnSavePreset);
+  presetField.append(presetLabel, presetRow);
+
+  const actions = document.createElement('div'); actions.className = 'watermark-actions';
+  const feedback = document.createElement('span'); feedback.className = 'caption-feedback'; feedback.setAttribute('role', 'status');
+  actions.append(saveBtn, feedback);
+
+  const exportNote = document.createElement('p'); exportNote.className = 'watermark-note';
+  exportNote.textContent = 'ℹ Pengaturan watermark tersimpan di draft klip ini. Ekspor video dengan watermark memerlukan pipeline ekspor per klip (M3) yang belum tersedia.';
+
+  function syncTypeUI() {
+    const isLogo = currentWm.type === 'logo';
+    btnTypeText.classList.toggle('active', !isLogo);
+    btnTypeLogo.classList.toggle('active', isLogo);
+    textPanel.hidden = isLogo;
+    logoPanel.hidden = !isLogo;
+  }
+
+  function syncPositionUI() {
+    const pos = currentWm.position || 'top_right';
+    for (const [k, btn] of Object.entries(posButtons)) {
+      btn.classList.toggle('active', k === pos);
+    }
+  }
+
+  function syncAllControlsFromConfig(cfg) {
+    if (!cfg) return;
+    currentWm = JSON.parse(JSON.stringify(cfg));
+    toggleCheckbox.checked = Boolean(currentWm.enabled);
+    body.hidden = !currentWm.enabled;
+    textInput.value = currentWm.text ?? '';
+    colorSelect.value = currentWm.text_color ?? 'white';
+    treatSelect.value = currentWm.text_treatment ?? 'outline';
+
+    const wValNum = Math.round(((currentWm.width_ratio ?? 0.15)) * 100);
+    wSlider.value = String(wValNum);
+    wVal.textContent = wValNum + '%';
+
+    const oValNum = Math.round(((currentWm.opacity ?? 0.70)) * 100);
+    oSlider.value = String(oValNum);
+    oVal.textContent = oValNum + '%';
+
+    const mValNum = Math.round(((currentWm.margin_ratio ?? 0.03)) * 100);
+    mSlider.value = String(mValNum);
+    mVal.textContent = mValNum + '%';
+
+    syncTypeUI();
+    syncPositionUI();
+
+    if (currentWm.type === 'logo' && currentWm.asset_id) {
+      logoThumb.src = '/api/watermark-assets/' + encodeURIComponent(currentWm.asset_id) + '/preview';
+      logoThumbWrap.hidden = false;
+      if (currentWm.asset_width && currentWm.asset_height) {
+        logoInfo.textContent = 'Logo (' + currentWm.asset_width + '×' + currentWm.asset_height + 'px)';
+      } else {
+        logoInfo.textContent = 'Logo tersimpan';
+      }
+    } else {
+      logoThumbWrap.hidden = true;
+      logoThumb.src = '';
+      logoInfo.textContent = '';
+    }
+    uploadFeedback.textContent = '';
+    updatePreview();
+  }
+
+  function checkClashForGeometry(pos, marginPx, targetW, targetH) {
+    let ox = 0;
+    if (pos.endsWith('left')) ox = marginPx;
+    else if (pos.endsWith('right')) ox = 140 - targetW - marginPx;
+    else ox = Math.round((140 - targetW) / 2);
+
+    let oy = 0;
+    if (pos.startsWith('top')) oy = marginPx;
+    else if (pos.startsWith('bottom')) oy = 248 - targetH - marginPx;
+    else oy = Math.round((248 - targetH) / 2);
+
+    const subX1 = 7, subX2 = 133, subY1 = 178, subY2 = 248;
+    const overlapW = Math.max(0, Math.min(ox + targetW, subX2) - Math.max(ox, subX1));
+    const overlapH = Math.max(0, Math.min(oy + targetH, subY2) - Math.max(oy, subY1));
+    clashWarning.hidden = !(overlapW > 0 && overlapH > 0);
+  }
+
+  function updatePreview() {
+    if (!currentWm.enabled) {
+      previewCanvas.hidden = true;
+      clashWarning.hidden = true;
+      return;
+    }
+    previewCanvas.hidden = false;
+
+    const marginRatio = currentWm.margin_ratio ?? 0.03;
+    const widthRatio = currentWm.width_ratio ?? 0.15;
+    const opacityVal = currentWm.opacity ?? 0.70;
+    const pos = currentWm.position || 'top_right';
+
+    // Canvas preview: 140px width x 248px height (dimensi terpendek = 140px)
+    const shortestDim = 140;
+    const marginPx = Math.round(marginRatio * shortestDim);
+    const targetW = Math.max(8, Math.round(widthRatio * 140));
+
+    previewOverlay.style.opacity = opacityVal;
+    previewOverlay.style.width = targetW + 'px';
+    previewOverlay.style.maxWidth = '';
+
+    // Vertikal
+    if (pos.startsWith('top')) {
+      previewOverlay.style.top = marginPx + 'px';
+      previewOverlay.style.bottom = '';
+    } else if (pos.startsWith('bottom')) {
+      previewOverlay.style.top = '';
+      previewOverlay.style.bottom = marginPx + 'px';
+    } else {
+      // center_left, center, center_right
+      previewOverlay.style.top = '50%';
+      previewOverlay.style.bottom = '';
+    }
+
+    // Horizontal
+    if (pos.endsWith('left')) {
+      previewOverlay.style.left = marginPx + 'px';
+      previewOverlay.style.right = '';
+    } else if (pos.endsWith('right')) {
+      previewOverlay.style.left = '';
+      previewOverlay.style.right = marginPx + 'px';
+    } else {
+      // top_center, center, bottom_center
+      previewOverlay.style.left = '50%';
+      previewOverlay.style.right = '';
+    }
+
+    // Transform offset
+    if (pos === 'center') {
+      previewOverlay.style.transform = 'translate(-50%, -50%)';
+    } else if (pos === 'top_center' || pos === 'bottom_center') {
+      previewOverlay.style.transform = 'translateX(-50%)';
+    } else if (pos === 'center_left' || pos === 'center_right') {
+      previewOverlay.style.transform = 'translateY(-50%)';
+    } else {
+      previewOverlay.style.transform = 'none';
+    }
+
+    let targetH = 14;
+    if (currentWm.type === 'logo' && currentWm.asset_id) {
+      const activeAssetId = currentWm.asset_id;
+      const loadId = ++currentLogoLoadId;
+      previewOverlay.replaceChildren();
+      const img = document.createElement('img');
+      img.src = '/api/watermark-assets/' + encodeURIComponent(activeAssetId) + '/preview';
+      img.style.width = '100%';
+      img.style.display = 'block';
+
+      if (currentWm.asset_width && currentWm.asset_height) {
+        const aspect = currentWm.asset_height / currentWm.asset_width;
+        targetH = Math.max(8, Math.round(targetW * aspect));
+      }
+
+      img.onload = () => {
+        if (loadId !== currentLogoLoadId || currentWm.type !== 'logo' || currentWm.asset_id !== activeAssetId) return;
+        if (img.naturalWidth && img.naturalHeight) {
+          currentWm.asset_width = img.naturalWidth;
+          currentWm.asset_height = img.naturalHeight;
+          if (logoInfo && (!logoInfo.textContent || logoInfo.textContent === 'Logo tersimpan')) {
+            logoInfo.textContent = 'Logo (' + img.naturalWidth + '×' + img.naturalHeight + 'px)';
+          }
+          const naturalAspect = img.naturalHeight / img.naturalWidth;
+          const realH = Math.max(8, Math.round(targetW * naturalAspect));
+          checkClashForGeometry(pos, marginPx, targetW, realH);
+        }
+      };
+      img.onerror = () => {
+        if (loadId !== currentLogoLoadId || currentWm.asset_id !== activeAssetId) return;
+        uploadFeedback.textContent = '⚠ Gagal memuat pratinjau gambar logo.';
+        uploadFeedback.style.color = '#c0392b';
+      };
+
+      previewOverlay.appendChild(img);
+    } else {
+      previewOverlay.replaceChildren();
+      const span = document.createElement('span');
+      span.textContent = currentWm.text || 'Watermark';
+      span.style.fontFamily = 'Arial, sans-serif';
+      span.style.fontWeight = 'bold';
+      const textLen = Math.max(1, (currentWm.text || 'Watermark').length);
+      const fontSize = Math.max(7, Math.min(13, Math.floor((targetW / Math.max(4, textLen)) * 1.5)));
+      span.style.fontSize = fontSize + 'px';
+      span.style.color = currentWm.text_color === 'black' ? '#000' : '#fff';
+      if (currentWm.text_treatment === 'outline') {
+        const outCol = currentWm.text_color === 'black' ? '#fff' : '#000';
+        span.style.textShadow = '1px 1px 0 ' + outCol + ', -1px -1px 0 ' + outCol + ', 1px -1px 0 ' + outCol + ', -1px 1px 0 ' + outCol;
+      } else if (currentWm.text_treatment === 'panel') {
+        span.style.background = currentWm.text_color === 'black' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)';
+        span.style.padding = '2px 4px';
+        span.style.borderRadius = '3px';
+      }
+      previewOverlay.appendChild(span);
+      targetH = Math.max(10, Math.round(fontSize * 1.4));
+    }
+
+    checkClashForGeometry(pos, marginPx, targetW, targetH);
+  }
+
+  toggleCheckbox.addEventListener('change', () => {
+    currentWm.enabled = toggleCheckbox.checked;
+    body.hidden = !currentWm.enabled;
+    updatePreview();
+    updateStatus('modified');
+  });
+
+  btnTypeText.addEventListener('click', () => {
+    currentWm.type = 'text';
+    syncTypeUI();
+    updatePreview();
+    updateStatus('modified');
+  });
+
+  btnTypeLogo.addEventListener('click', () => {
+    currentWm.type = 'logo';
+    syncTypeUI();
+    updatePreview();
+    updateStatus('modified');
+  });
+
+  textInput.addEventListener('input', () => {
+    currentWm.text = textInput.value;
+    updatePreview();
+    updateStatus('modified');
+  });
+
+  colorSelect.addEventListener('change', () => {
+    currentWm.text_color = colorSelect.value;
+    updatePreview();
+    updateStatus('modified');
+  });
+
+  treatSelect.addEventListener('change', () => {
+    currentWm.text_treatment = treatSelect.value;
+    updatePreview();
+    updateStatus('modified');
+  });
+
+  wSlider.addEventListener('input', () => {
+    wVal.textContent = wSlider.value + '%';
+    currentWm.width_ratio = Number(wSlider.value) / 100;
+    updatePreview();
+    updateStatus('modified');
+  });
+
+  oSlider.addEventListener('input', () => {
+    oVal.textContent = oSlider.value + '%';
+    currentWm.opacity = Number(oSlider.value) / 100;
+    updatePreview();
+    updateStatus('modified');
+  });
+
+  mSlider.addEventListener('input', () => {
+    mVal.textContent = mSlider.value + '%';
+    currentWm.margin_ratio = Number(mSlider.value) / 100;
+    updatePreview();
+    updateStatus('modified');
+  });
+
+  fileInput.addEventListener('change', async () => {
+    if (!fileInput.files || !fileInput.files[0]) return;
+    const file = fileInput.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+      uploadFeedback.textContent = '⚠ Ukuran file melebihi batas 5 MiB.';
+      uploadFeedback.style.color = '#c0392b';
+      return;
+    }
+    uploadFeedback.textContent = 'Mengunggah dan menormalisasi logo…';
+    uploadFeedback.style.color = '#556247';
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await api('/api/watermark-assets', { method: 'POST', body: fd });
+      currentWm.asset_id = res.asset_id;
+      currentWm.asset_width = res.width;
+      currentWm.asset_height = res.height;
+      logoThumb.src = '/api/watermark-assets/' + encodeURIComponent(res.asset_id) + '/preview';
+      logoThumbWrap.hidden = false;
+      logoInfo.textContent = res.image_format.toUpperCase() + ' (' + res.width + '×' + res.height + 'px)';
+      uploadFeedback.textContent = res.image_format === 'jpg' ? '✓ Logo JPG diunggah (tanpa transparansi bawaan).' : '✓ Logo PNG transparan diunggah.';
+      uploadFeedback.style.color = '#27ae60';
+      updatePreview();
+      updateStatus('modified');
+    } catch (err) {
+      uploadFeedback.textContent = '⚠ ' + (err.message || 'Gagal mengunggah logo.');
+      uploadFeedback.style.color = '#c0392b';
+    }
+  });
+
+  async function loadPresetList() {
+    try {
+      const data = await api('/api/watermark-presets');
+      presetSelect.innerHTML = '<option value="">-- Pilih preset tersimpan --</option>';
+      (data.presets || []).forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.preset_id;
+        opt.textContent = p.name;
+        opt.dataset.config = JSON.stringify(p.configuration);
+        presetSelect.appendChild(opt);
+      });
+    } catch (_) {}
+  }
+  loadPresetList();
+
+  btnApplyPreset.addEventListener('click', () => {
+    const sel = presetSelect.selectedOptions[0];
+    if (!sel || !sel.dataset.config) return;
+    try {
+      const cfg = JSON.parse(sel.dataset.config);
+      syncAllControlsFromConfig(cfg);
+      updateStatus('modified');
+      feedback.textContent = 'Preset "' + sel.textContent + '" diterapkan ke draft.';
+    } catch (_) {}
+  });
+
+  btnSavePreset.addEventListener('click', async () => {
+    const name = window.prompt('Masukkan nama preset watermark baru:', 'Preset ' + (currentWm.type === 'logo' ? 'Logo' : currentWm.text || 'Klip'));
+    if (!name || !name.trim()) return;
+    try {
+      await api('/api/watermark-presets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), configuration: currentWm })
+      });
+      await loadPresetList();
+      feedback.textContent = 'Preset baru berhasil disimpan.';
+    } catch (err) {
+      feedback.textContent = 'Gagal menyimpan preset: ' + err.message;
+    }
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    if (isBusy || !isDirty()) return;
+    isBusy = true;
+    syncDirtyState();
+    updateStatus('saving');
+    feedback.textContent = ''; feedback.classList.remove('is-error');
+
+    try {
+      const res = await api('/api/jobs/' + encodeURIComponent(jobId) + '/clips/' + encodeURIComponent(clipId) + '/watermark', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ watermark: currentWm, expected_revision: currentRevision })
+      });
+      clip.watermark = res.watermark;
+      currentRevision = res.watermark_revision || (currentRevision + 1);
+      clip.watermark_revision = currentRevision;
+      savedWm = JSON.parse(JSON.stringify(res.watermark));
+      conflictBanner.hidden = true;
+      syncAllControlsFromConfig(res.watermark);
+      updateStatus('saved');
+      if (res.clash_detected) {
+        clashWarning.hidden = false;
+        if (res.clash_message) clashWarning.textContent = '⚠ ' + res.clash_message;
+      }
+      feedback.textContent = 'Pengaturan watermark tersimpan di draft klip.';
+    } catch (err) {
+      if (err.data && err.data.conflict) {
+        updateStatus('conflict');
+        showConflictUI(err.data);
+      } else {
+        updateStatus('error');
+        feedback.textContent = err.message || 'Gagal menyimpan watermark.';
+        feedback.classList.add('is-error');
+      }
+    } finally {
+      isBusy = false;
+      syncDirtyState();
+    }
+  });
+
+  function showConflictUI(data) {
+    conflictBanner.replaceChildren(); conflictBanner.hidden = false;
+    const msg = document.createElement('p');
+    msg.textContent = 'Konflik revisi: Watermark di server telah diperbarui oleh sesi lain. Perubahanmu tetap tersimpan di form.';
+    const actionsDiv = document.createElement('div'); actionsDiv.className = 'conflict-banner-actions';
+    const loadServerBtn = document.createElement('button'); loadServerBtn.type = 'button';
+    loadServerBtn.textContent = 'Pakai versi server';
+    loadServerBtn.addEventListener('click', () => {
+      if (data.server_watermark) {
+        savedWm = JSON.parse(JSON.stringify(data.server_watermark));
+        syncAllControlsFromConfig(data.server_watermark);
+      }
+      currentRevision = data.current_revision;
+      clip.watermark_revision = currentRevision;
+      conflictBanner.hidden = true;
+      updateStatus('saved');
+      feedback.textContent = 'Versi server dimuat ke form.';
+    });
+    const overwriteBtn = document.createElement('button'); overwriteBtn.type = 'button';
+    overwriteBtn.textContent = 'Timpa dengan konfigurasi ini';
+    overwriteBtn.addEventListener('click', () => {
+      currentRevision = data.current_revision;
+      conflictBanner.hidden = true;
+      saveBtn.click();
+    });
+    actionsDiv.append(loadServerBtn, overwriteBtn);
+    conflictBanner.append(msg, actionsDiv);
+  }
+
+  syncAllControlsFromConfig(currentWm);
+  updateStatus('saved');
+
+  body.append(typeField, textPanel, logoPanel, posField, slidersField, previewArea, presetField);
+  box.append(header, statusBadge, conflictBanner, body, actions, exportNote);
   return box;
 }
 function render(job) {
@@ -388,7 +1010,7 @@ function render(job) {
     const text = document.createElement('p'); text.textContent = c.text;
     const download = document.createElement('a'); download.className = 'download'; download.href = c.url + '?download=1'; download.textContent = 'Unduh MP4 ↓';
     const framing = document.createElement('small'); framing.className = 'framing-note'; framing.textContent = c.framing?.note || 'Hasil lama · crop tengah';
-    card.append(video, heading, time, framing, text, download, captionEditor(c, i, job.id, job.audience)); grid.append(card);
+    card.append(video, heading, time, framing, text, download, captionEditor(c, i, job.id, job.audience), watermarkEditor(c, i, job.id)); grid.append(card);
   });
 }
 function display(job) {
