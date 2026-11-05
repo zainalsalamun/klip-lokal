@@ -27,8 +27,8 @@ def main():
         return 0 if state else 1
     if action == "stop":
         state = health()
-        if state and state.get("active_jobs"):
-            print("Ada video sedang diproses. Tunggu sampai selesai sebelum menghentikan server.")
+        if state and (state.get("active_jobs") or state.get("active_caption")):
+            print("Ada video atau caption AI sedang diproses. Tunggu sampai selesai sebelum menghentikan server.")
             return 1
         if registered():
             subprocess.run(["launchctl", "remove", LABEL], check=True)
