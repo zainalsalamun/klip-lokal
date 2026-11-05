@@ -2,10 +2,18 @@
 
 ## Struktur source
 
+Baca [CONTRIBUTING](../CONTRIBUTING.md) dan [AGENTS](../AGENTS.md) sebelum mengubah source. Command dan pemilihan pemeriksaan dirangkum di [TESTING](TESTING.md); alasan desain ada di [DECISIONS](DECISIONS.md).
+
 ```text
 klip-lokal/
   app.py                    server, pipeline, scoring, subtitle dan route
-  package.json              perintah npm run dev / npm start
+  local_caption.py          ringkasan caption melalui Ollama lokal
+  speaker_crop.py           perkiraan pembicara dan posisi crop
+  subtitle_styles.py        preset ASS dan label pilihan
+  global_content.py         topik dan ide editorial
+  AGENTS.md                 panduan coding agent
+  CONTRIBUTING.md            alur kontribusi developer
+  package.json              dev / start / setup:ai
   dev.sh                    bootstrap dan server foreground
   Mulai.command             launcher server latar belakang macOS
   Berhenti.command          penghentian server
@@ -33,7 +41,7 @@ npm run dev
 
 `npm run dev` menyiapkan dependensi dan menghentikan server launcher secara otomatis bila tidak ada pekerjaan aktif. Perintah ini menjalankan server foreground, log terlihat langsung, dan dihentikan dengan Control-C. Alternatif langsung: `./dev.sh`.
 
-Debug/reloader sengaja nonaktif karena worker/model disimpan dalam proses. Restart server setelah mengubah Python. Muat ulang browser setelah perubahan template atau aset; hard refresh bila cache masih menampilkan versi lama. Jangan menjalankan beberapa server untuk folder data yang sama.
+Debug/reloader sengaja nonaktif karena worker/model disimpan dalam proses. Restart server saat idle setelah mengubah Python atau template Jinja. Muat ulang browser setelah perubahan aset; hard refresh bila cache masih menampilkan versi lama. Jangan menjalankan beberapa server untuk folder data yang sama.
 
 ## Titik konfigurasi di app.py
 
@@ -44,7 +52,8 @@ Debug/reloader sengaja nonaktif karena worker/model disimpan dalam proses. Resta
 | Model dan compute | `WhisperModel()` dalam `process()` |
 | Bahasa/durasi/jumlah yang diterima | Validasi `create()`; selaraskan opsi HTML |
 | Skor kandidat | `candidates()` |
-| Tampilan subtitle | Header ASS di `write_subs()` |
+| Tampilan subtitle | `subtitle_styles.py` dan `write_subs()` |
+| Caption AI lokal | `local_caption.py`, endpoint regenerasi dan editor di JS |
 | Resolusi, crop, codec | `RESOLUTIONS` dan `render_clip()` |
 | Download format/runtime | Opsi `yt_dlp.YoutubeDL()` |
 
@@ -128,7 +137,7 @@ Tes menggunakan direktori sementara: seluruh artefak target terhapus, metadata t
 
 ## Caption posting
 
-`make_caption()` menyiapkan draft awal dari transkrip; `read_job()` menyediakan fallback untuk history lama. UI memiliki fallback yang sama untuk kompatibilitas saat server versi lama masih menyelesaikan pekerjaan. Caption hasil edit disimpan di localStorage berdasarkan URL klip, dan dihapus bersama history di browser tersebut. `tests/test_caption.py` memeriksa struktur, batas teks dan kompatibilitas history lama.
+`local_caption.summarize()` membuat ringkasan topik setelah ekspor klip. Endpoint regenerasi memungkinkan history lama mendapat caption AI tanpa ekspor ulang. `make_caption()`/`legacy_caption()` dan fallback JS mempertahankan kompatibilitas caption lama, yang diberi label belum dirangkum AI. Draft manual disimpan di localStorage; caption AI disimpan pada metadata server. UI meminta konfirmasi di halaman sebelum mengganti draft yang diedit. Lihat [LOCAL_AI](LOCAL_AI.md) dan [TESTING](TESTING.md) untuk batas dan verifikasinya.
 
 ## Uji riwayat banyak
 
@@ -138,9 +147,9 @@ Tes menggunakan direktori sementara: seluruh artefak target terhapus, metadata t
 
 Ide terkurasi berada di `global_content.py`. Tambahkan topik secara serentak pada `TOPICS`, kartu ide, opsi template dan dokumentasi. Tes `test_global_studio.py` mencakup route/ide, validasi input, penerusan konfigurasi, pemilihan task transcribe/translate, caption Inggris, penggunaan sumber audio yang sama dan bobot niche. Dokumentasi khusus tersedia di GLOBAL.md.
 
-## Sidebar riwayat
+## Navigasi riwayat
 
-Template menempatkan history dalam aside, dan JavaScript merelokasi node yang sama sebagai fallback untuk template lama yang masih tercache. Desktop memakai sidebar tetap dengan daftar yang bisa di-scroll sendiri. Pada lebar ≤820px, sidebar menjadi drawer, dengan backdrop, Escape, focus trap, serta inert saat tertutup. Pemilihan history menutup drawer. Desktop dan viewport 390×844 telah ditinjau di browser.
+Sidebar hanya berisi menu **Riwayat klip**. Konten history berada di area utama dan dibuka lewat hash `#history`; `syncView()` menukar tampilan studio/history. Search, filter, pagination dan hapus tetap tersedia di halaman lebar. Pada layar ≤820px sidebar navigasi menjadi drawer dengan backdrop, Escape, focus trap dan inert saat tertutup. Membuka hasil mengembalikan tampilan studio.
 
 ## Uji klasifikasi error frontend
 
@@ -153,4 +162,24 @@ Tes `test_speech_cuts.py` memeriksa segmen ucapan utuh, akhir kalimat, batas dur
 `tests/test_subtitle_styles.py` memeriksa validasi preset, penyimpanan/restart, penerusan opsi worker, fallback history lama, dan render MP4 semua gaya di 480p serta 720p. Frame ekspor dibandingkan agar setiap preset benar-benar berbeda; piksel kuning juga diverifikasi. Preset default mempertahankan ASS style sebelumnya. Untuk menambah gaya, daftarkan di `subtitle_styles.py` dan tambahkan aturan preview CSS dengan nama preset yang sama.
 
 
-Caption semantik: `local_caption.py` memakai Ollama loopback dengan JSON schema, `think=false`, context 2048, batas output, kutipan pendukung verbatim dan penolakan transkrip tidak jelas. `tests/test_local_caption.py` menguji payload bahasa/privasi lokal, parsing/validasi, model tidak tersedia, persistensi endpoint, pelestarian video/caption pada kegagalan dan guard video aktif. Unit test memalsukan transport AI; uji model nyata dilakukan terpisah sesudah setup.
+Caption semantik: `local_caption.py` memakai Ollama loopback dengan JSON schema, `think=false`/context 2048 pada percobaan awal dan `think=true`/context 3072 saat memperbaiki bahasa, batas output, kutipan pendukung verbatim dan penolakan transkrip tidak jelas. `tests/test_local_caption.py` menguji payload bahasa/privasi lokal, parsing/validasi, model tidak tersedia, persistensi endpoint, pelestarian video/caption pada kegagalan dan guard video aktif. Unit test memalsukan transport AI; uji model nyata dilakukan terpisah sesudah setup.
+
+
+Pemeriksaan kualitas awal memakai pengulangan trigram/kata dominan agar transkrip ASR yang sangat repetitif ditolak sebelum inferensi. Uji nyata menemukan prompt saja tidak cukup menolak semua input kacau; validasi ini melengkapi prompt dan kutipan pendukung, bukan jaminan pemahaman semantik.
+
+
+Bootstrap terpusat ada di `setup_local.py`, dipakai `npm run setup`, `setup:ai`, dan kedua launcher. `npm run doctor` melakukan pemeriksaan baca-saja. Perubahan requirements harus mempertimbangkan marker hash dan `.venv` lama. Lihat [NEW_MACHINE](NEW_MACHINE.md) untuk dukungan platform dan pengujian checkout bersih.
+
+
+Bahasa caption ditentukan oleh audience: lokal Indonesia, Global Inggris. `langdetect` dengan seed tetap memeriksa keluaran; salah bahasa memicu satu retry lalu penolakan. Prompt/few-shot dipisah per bahasa. Model memilih indeks kalimat untuk evidence agar kutipan sumber tidak diparafrasekan. Tes mencakup penolakan bahasa salah, batas retry, terjemahan caption dengan evidence bahasa sumber, dan validasi indeks.
+
+
+## Modul Studio Anak (Milestone K1)
+
+1. **Modul Ide & Data**: `kids_content.py` mendefinisikan katalog 10 ide editorial orisinal (`IDEAS`), 10 kategori terkurasi (`CATEGORIES`), sumber acuan kebijakan platform (`SOURCES`), serta fungsi validasi payload, penulisan atomik, dan pembacaan brief.
+2. **Penyimpanan Brief Terisolasi**: Brief disimpan di `data/kids-briefs/<brief_id>.json` secara terpisah dari folder pekerjaan video, sehingga scanner riwayat `job_summary()` mengabaikannya secara otomatis.
+3. **Pengendalian Konkurensi Optimistik (OCC)**: `PATCH /api/kids/briefs/<id>` mewajibkan parameter `expected_revision`. Ketidakcocokan versi memicu respons HTTP 409 dengan data versi server terkini, memungkinkan antarmuka menyelesaikan konflik tanpa kehilangan draft lokal.
+4. **Ekspor Offline**: Fungsi `format_brief_txt` di backend dan implementasi blob di frontend menyediakan ekspor teks dan JSON tanpa memerlukan koneksi jaringan, model AI, atau worker media.
+5. **Pengujian**:
+   - `tests/test_kids_studio.py`: Pengujian unit dan integrasi API (11 tes) mencakup validasi batas karakter, atomisitas simpan/baca/hapus, OCC 409, dan isolasi dari scanner history.
+   - `tests/test_browser_kids_studio.py`: Pengujian antarmuka Chrome Headless nyata (4 tes) membuktikan tidak adanya exception null-form, fungsi filter kategori ide, penanganan konflik 409, dan responsivitas layar sempit 375×667.
