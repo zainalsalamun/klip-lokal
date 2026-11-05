@@ -71,3 +71,12 @@ Preset tampilan subtitle didefinisikan di `subtitle_styles.py`. UI merender daft
 
 
 Setelah ekspor MP4, worker menjalankan `local_caption.summarize()` berurutan pada transkrip tiap klip. Runtime memakai Ollama loopback dengan model Qwen3 1.7B. Output JSON harus memuat caption singkat dan kutipan pendukung yang ada dalam transkrip. Kegagalan AI tidak menggagalkan video. Endpoint regenerasi caption memperbarui metadata secara atomik tanpa menulis video; permintaan tidak memegang lock pekerjaan selama inferensi. Tidak ada cloud fallback.
+
+## Modul Watermark
+
+Modul `watermark.py` mengelola konfigurasi, aset, preset, geometri penempatan, deteksi benturan, dan komposisi overlay visual pada klip:
+1. **Validasi & Penyimpanan Aset**: Unggahan logo dibatasi 5 MiB, format PNG/JPG, dimensi 10×10 hingga 4096×4096 piksel, penolakan animasi (APNG) dan rasio dekompresi bomb (maksimal 200:1 dan 16,7M total piksel). File dinormalisasi dan disimpan di `data/watermark-assets/<asset_id>.<ext>`.
+2. **Preset Reusable**: Daftar preset watermark disimpan di `data/watermark-presets.json` dengan penulisan file sementara atomik.
+3. **Geometri & Deteksi Benturan**: Kotak batas watermark dihitung dari 9 jangkar posisi, persentase lebar kanvas, dan persentase margin dari dimensi terpendek kanvas (mendukung margin 0% rapat tepi). Deteksi benturan subtitle memeriksa irisan geometris antara bounding box watermark dan area subtitle ASS (zona bawah vertikal y=72%–100%), sehingga logo tinggi di tengah maupun watermark di area bawah terdeteksi secara akurat.
+4. **Compositing**: Fungsi `composite_watermark()` memanfaatkan OpenCV dan NumPy untuk merender teks ber-outline/panel atau logo dengan blending alpha kanal transparan langsung ke frame citra.
+5. **Konkurensi & Lifecycle**: Klip melacak nomor revisi terpisah: `watermark_revision` untuk watermark dan `caption_revision`/`metadata_revision` untuk caption. Pemisahan ini mencegah konflik revisi antar-editor dalam satu kartu yang sama saat pengguna mengedit keduanya. Ekspor pembakaran watermark ke berkas MP4 baru terpisah dan siap dipanggil saat pipeline ekspor ulang versi (M3) tersedia.

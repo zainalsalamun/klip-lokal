@@ -31,9 +31,36 @@ Subtitle dikelompokkan sampai delapan kata. Durasi kelompok dibagi rata di dalam
 
 Setiap klip memiliki caption terpisah dari subtitle video. AI lokal membaca transkrip klip dan merangkum inti pembahasan menjadi satu kalimat singkat, target 6–12 kata, tanpa CTA/hashtag. Ini membutuhkan Ollama dan model Qwen3 1.7B; lihat [setup AI lokal](LOCAL_AI.md). Caption hasil lama dapat dirangkum lewat **Buat caption AI lokal** tanpa memproses ulang MP4. Bila transkrip kurang jelas atau AI tidak tersedia, aplikasi memberi alasan dan tetap menyediakan editor manual. Tinjau akurasi dan konteks sebelum memposting.
 
-Edit teks pada **Caption posting**, klik **Salin caption**, atau **Unduh TXT**. TXT mengikuti teks hasil edit. Perubahan disimpan otomatis di localStorage browser untuk setiap klip; refresh di browser yang sama akan mempertahankan edit. Perubahan belum disinkronkan ke server atau browser lain. Jika storage browser dibersihkan, draft kembali ke teks awal. Bila akses clipboard ditolak, teks diseleksi dan dapat disalin dengan ⌘C/Ctrl+C.
+Edit teks pada **Caption posting**, klik **Simpan caption**, **Salin caption**, atau **Unduh TXT**. Tombol **Simpan caption** menyimpan teks secara persisten ke metadata server (`job.json`) sehingga hasil edit tetap bertahan setelah refresh, restart aplikasi, atau dibuka dari browser lain pada laptop yang sama. Teks dibatasi maksimal 2.000 karakter, dan teks kosong diperbolehkan sebagai keputusan pengguna. Caption manual ditandai sebagai edit manual pilihan pengguna, bukan hasil verifikasi AI.
 
-Klip baru menyimpan caption awal pada metadata server. Klip lama juga mendapat draft saat dibuka dari history. Menghapus history melalui aplikasi membersihkan draft lokal untuk pekerjaan itu di browser yang digunakan.
+Indikator status menampilkan state caption: *Tersimpan*, *Ada perubahan belum disimpan*, *Menyimpan*, *Konflik*, atau *Gagal*. Jika ditemukan draft browser lama dari versi sebelumnya, editor menampilkan pemberitahuan dengan opsi **Pulihkan draft browser** atau **Pakai versi tersimpan**. Perlindungan konflik revisi (*optimistic concurrency*) memastikan dua tab yang mengedit klip bersamaan tidak saling menimpa diam-diam; teks lokal Anda tidak akan hilang jika terjadi konflik atau gangguan koneksi. Pindah halaman atau video dengan perubahan belum disimpan akan meminta konfirmasi terlebih dahulu.
+
+Klip baru menyimpan caption awal pada metadata server dengan ID klip stabil (`clip_id`). Klip lama juga mendapat pemetaan ID konsisten saat dibuka dari riwayat. Menghapus riwayat melalui aplikasi membersihkan berkas pekerjaan dan draft lokal terkait.
+
+## Watermark video (Teks dan Logo)
+
+Setiap klip menyediakan panel **Watermark (Teks / Logo)** opsional yang dapat dibuka dari kartu hasil. Pengguna dapat membubuhkan identitas channel/brand pada klip tanpa merusak video asli.
+
+1. **Aktifkan watermark**: Centang kotak "Aktifkan watermark pada klip ini".
+2. **Pilih jenis**:
+   - **Teks**: Tulis hingga 60 karakter (satu baris). Pilih warna putih atau hitam, serta gaya teks (*Outline*, *Panel latar*, atau *Polos*).
+   - **Logo**: Unggah file PNG (dengan transparansi) atau JPEG hingga 5 MiB (minimal 10×10 piksel hingga maksimal 4096×4096 piksel). Format animasi (APNG) dan rasio dekompresi ekstrem ditolak demi keamanan. Logo yang diunggah dinormalisasi dan disimpan di pustaka aset lokal.
+3. **Atur tata letak**:
+   - **Posisi 9 jangkar**: Pilih titik penempatan (Kiri Atas, Tengah Atas, Kanan Atas, Kiri Tengah, Tengah, Kanan Tengah, Kiri Bawah, Tengah Bawah, Kanan Bawah). Default: Kanan Atas. Posisi tengah samping (Kiri Tengah / Kanan Tengah) dipusatkan secara vertikal (`top: 50%`).
+   - **Lebar**: 5% hingga 30% dari lebar kanvas video (rasio aspek logo dipertahankan).
+   - **Transparansi / Opasitas**: 10% hingga 100%.
+   - **Jarak tepi (Margin)**: 0% hingga 10% dari dimensi terpendek kanvas. Margin 0% menempelkan watermark persis di tepi frame.
+4. **Tinjau preview interaktif & deteksi benturan**:
+   - Kanvas vertikal 9:16 memperlihatkan posisi watermark secara proporsional terhadap kanvas ekspor.
+   - Kotak merah putus-putus menunjukkan area subtitle bawaan di bagian bawah (y=72%–100%).
+   - Sistem mendeteksi benturan secara geometris: jika kotak batas watermark (misalnya logo tinggi di posisi tengah ataupun teks di posisi bawah) beririsan dengan area subtitle, peringatan benturan (*clash warning*) ditampilkan secara otomatis.
+5. **Preset watermark**:
+   - Simpan pengaturan yang sering dipakai sebagai preset lokal agar mudah diterapkan ke klip lain.
+6. **Simpan draft & isolasi revisi**:
+   - Klik **Simpan watermark** untuk menyimpan pengaturan ke metadata server (`job.json`) dengan nomor revisi watermark (`watermark_revision`).
+   - Revisi watermark terpisah dari revisi caption: mengedit dan menyimpan watermark tidak membatalkan atau memicu konflik pada editor caption di kartu yang sama.
+   - Jika terjadi konflik dari tab/sesi lain, opsi **Pakai versi server** akan menyinkronkan seluruh kontrol form (tipe teks/logo, input, dropdown, slider, tombol posisi, dan thumbnail logo) ke versi server terkini.
+   - *Catatan dependensi*: Pembakaran watermark ke file MP4 baru akan diintegrasikan dengan lifecycle render versi pada milestone ekspor ulang (M3). Saat ini draft tersimpan aman di server dan dapat dipratinjau secara langsung di editor.
 
 ## Data, riwayat, dan penghentian
 
@@ -78,3 +105,29 @@ Pilihan disimpan pada pekerjaan dan klip. Membuka history mengembalikan pilihann
 
 
 Caption lama yang belum dirangkum AI ditandai sebagai cuplikan transkrip. Gunakan **Buat caption AI lokal** untuk menghasilkan ringkasan pembahasan. Draft yang sudah diedit meminta konfirmasi sebelum diganti.
+
+
+Konfirmasi Hapus history memakai dialog aplikasi: judul dan jumlah hasil klip ditampilkan sebelum tombol **Hapus permanen**. Fokus awal berada pada **Batal**; Escape, tombol tutup, Batal atau klik latar membatalkan tanpa menghapus. Selama permintaan hapus berjalan tombol baris dinonaktifkan; kegagalan ditampilkan dan tombol bisa digunakan kembali.
+
+
+## Studio Anak (Usia 3–5 Tahun · Bahasa Indonesia)
+
+Buka menu **Studio Anak** di sidebar atau navigasi ke `/kids`. Studio ini dirancang untuk kreator dewasa yang memproduksi konten edukatif anak usia 3–5 tahun berbahasa Indonesia.
+
+### Katalog Ide Editorial
+1. Telusuri katalog 10 ide awal berdasarkan riset (warna, hitung 1–5, bentuk, suara hewan, lagu & rutinitas, gerak/tepuk, cerita bergiliran, emosi dasar, gambar bentuk, dan besar/kecil).
+2. Gunakan tombol filter kategori di bagian atas katalog untuk membatasi tampilan ide.
+3. Setiap kartu ide memuat tujuan pembelajaran tunggal, outline alur video, kebutuhan aset/peraga, target durasi, dan label kelayakan workflow (misalnya lagu/gerak ditandai memerlukan pemilihan manual karena clipper berbasis transkrip ucapan).
+4. Klik **Pakai ide ini ↗** pada kartu untuk langsung menyalin rancangan ide ke dalam form editor brief.
+
+### Perencanaan & Manajemen Brief Lokal
+1. **Lengkapi Form Brief**: Masukkan judul kerja (maks. 120 karakter), tujuan pembelajaran tunggal (maks. 300 karakter), outline alur (maks. 2000 karakter), dan catatan aset/peraga (maks. 2000 karakter).
+2. **Simpan Brief**: Klik **Simpan brief** untuk menyimpan rancangan ke disk lokal (`data/kids-briefs/`). Sistem melacak nomor revisi secara otomatis dan melindungi dari konflik multi-tab (*optimistic concurrency control*).
+3. **Ekspor Offline**:
+   - **Salin TXT**: Menyalin draf brief dalam format teks terstruktur ke clipboard.
+   - **Unduh TXT**: Mengunduh berkas `.txt` yang siap dibagikan atau dicetak.
+   - **Unduh JSON**: Mengunduh berkas `.json` untuk cadangan data lokal.
+4. **Buka Kembali Brief**: Panel sebelah kanan menampilkan daftar brief yang tersimpan. Klik **Buka di editor ↗** untuk memuat kembali rancangan yang pernah dibuat.
+
+
+Saat menyimpan brief Studio Anak, form dan tombol pergantian brief terkunci hingga request selesai. Kegagalan simpan mempertahankan teks agar dapat dicoba ulang. Draft belum tersimpan memicu peringatan saat keluar editor/refresh; peringatan ini bukan autosave atau penyimpanan draft browser. Simpan brief sebelum menutup aplikasi.

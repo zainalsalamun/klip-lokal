@@ -1,15 +1,21 @@
 # Caption AI lokal
 
-Caption AI membaca **transkrip tiap klip**, bukan keseluruhan judul video. Model merangkum inti pembahasan menjadi satu kalimat, target 6–12 kata (batas validasi 16 kata / 120 karakter), tanpa CTA, hashtag atau klaim baru. Studio lokal menghasilkan bahasa Indonesia; Studio Global menghasilkan bahasa Inggris. Model tidak melihat gambar: pembahasan visual tanpa narasi tidak dapat dipahami lewat fitur ini.
+Caption AI membaca **transkrip tiap klip**, bukan keseluruhan judul video. Model merangkum inti pembahasan menjadi satu kalimat, target 6–12 kata (batas validasi 16 kata / 120 karakter), tanpa CTA, hashtag atau klaim baru. Caption Studio lokal wajib bahasa Indonesia; Studio Global menghasilkan bahasa Inggris. Model tidak melihat gambar: pembahasan visual tanpa narasi tidak dapat dipahami lewat fitur ini.
 
 ## Instalasi
 
-1. Pasang [Ollama resmi](https://ollama.com/download). Di macOS dengan Homebrew: `brew install ollama`.
-2. Dari root source, jalankan `.venv/bin/python local_caption.py` (atau `npm run setup:ai` setelah environment Python tersedia).
-3. Setup menjalankan server Ollama lokal bila diperlukan dan mengunduh `qwen3:1.7b` (sekitar 1,4 GB). Internet diperlukan untuk instalasi/unduhan pertama. Setelah model tersedia, inferensi bisa dilakukan tanpa internet.
-4. Jalankan aplikasi seperti biasa (`npm run dev` atau launcher). Runtime Ollama akan dijalankan saat caption diperlukan; model tidak diunduh otomatis di tengah proses video.
+Pengguna baru mengikuti [NEW_MACHINE](NEW_MACHINE.md). Pada macOS:
 
-Jika memasang Ollama untuk Windows/Linux, gunakan installer resmi. Launcher aplikasi saat ini berupa shell macOS/Linux; perintah Python dapat dijalankan langsung dari virtual environment di platform lain.
+1. Pasang Python 3.11–3.13, npm dan [Ollama resmi](https://ollama.com/download/mac). Homebrew: `brew install python@3.13 node ollama` jika Homebrew sudah tersedia.
+2. Clone repository dan buka root source. Jalankan `npm run setup:ai`; bootstrap dasar dijalankan otomatis sehingga `.venv` tidak perlu dibuat manual dahulu.
+3. Setup menjalankan server Ollama lokal bila diperlukan, memeriksa model, dan mengunduh `qwen3:1.7b` hanya jika belum ada. Progress dicetak di Terminal. Model yang sudah siap dipakai kembali, termasuk jika CLI tidak ditemukan tetapi endpoint Ollama sudah berjalan.
+4. Jalankan `npm run doctor`, lalu `npm run dev` atau launcher macOS.
+
+Internet diperlukan untuk instalasi/unduhan pertama. Setelah model tersedia, inferensi dapat dilakukan tanpa internet. Model caption tidak diunduh otomatis di tengah proses video. Script tidak memasang Ollama atau paket sistem secara diam-diam; runtime yang belum tersedia menampilkan petunjuk instalasi. Jika unduhan terputus, ulangi `npm run setup:ai`.
+
+Qwen3 1.7B dipilih sebagai default ringan yang diuji pada RAM 8 GB, bukan konfigurasi khusus pemilik laptop. Model sama bisa dipakai pengguna lain; kecepatan dan kecukupan RAM harus diperiksa pada mesin masing-masing. `npm run doctor` melaporkan RAM/disk/runtime. Belum ada pemilihan model otomatis berdasarkan hardware.
+
+Ollama juga tersedia untuk Windows/Linux, tetapi aplikasi Klip lengkap belum didukung end-to-end di kedua OS tersebut. Jangan menganggap launcher macOS dapat langsung dipakai di sana.
 
 ## Pemakaian
 
@@ -27,14 +33,20 @@ Model berada di penyimpanan Ollama (default `~/.ollama/models`), terpisah dari `
 
 ## Batas akurasi
 
-AI merangkum transkrip yang tersedia, bukan mendengarkan ulang audio. Kesalahan ASR dapat menghasilkan caption keliru. Prompt meminta model menolak transkrip yang tidak jelas/repetitif dan mengembalikan kutipan pendukung. Aplikasi memvalidasi kutipan benar-benar ada pada transkrip, panjang output, dan struktur respons. Pemeriksaan ini tidak membuktikan caption benar secara semantik; selalu tinjau sebelum posting. Model kecil dapat melewatkan konteks, humor, slang, atau negasi. Penolakan AI ditandai `needs_review`, bukan diganti caption hasil tebakan.
+AI merangkum transkrip yang tersedia, bukan mendengarkan ulang audio. Kesalahan ASR dapat menghasilkan caption keliru. Pemeriksaan awal menolak pola pengulangan parah (trigram atau kata dominan). Prompt juga meminta model menolak transkrip yang tidak jelas/repetitif dan memilih indeks kalimat pendukung. Aplikasi mengambil kutipan persis dari kalimat sumber; model tidak perlu menyalin ulang ejaan transkrip. Aplikasi memvalidasi kutipan benar-benar ada pada transkrip, minimal tiga kata dan berbagi kata topik dengan caption, panjang output, dan struktur respons. Pemeriksaan ini tidak membuktikan caption benar secara semantik; selalu tinjau sebelum posting. Model kecil dapat melewatkan konteks, humor, slang, atau negasi. Penolakan AI ditandai `needs_review`, bukan diganti caption hasil tebakan.
 
 ## Troubleshooting
 
 - **Ollama belum terpasang:** pasang dari sumber resmi, kemudian jalankan setup.
 - **Model belum tersedia:** `ollama pull qwen3:1.7b` atau jalankan ulang setup.
 - **Runtime gagal dimulai:** lihat `data/ollama.log`, pastikan port 11434 tidak dipakai layanan lain.
-- **Tidak merespons:** tunggu pemuatan model, periksa RAM, coba `ollama run qwen3:1.7b` di Terminal. Timeout aplikasi 180 detik per caption.
+- **Tidak merespons:** tunggu pemuatan model, periksa RAM, coba `ollama run qwen3:1.7b` di Terminal. Timeout 180 detik per permintaan model; perbaikan bahasa bisa menambah satu permintaan. Mode penalaran diaktifkan hanya saat memperbaiki bahasa yang salah, sehingga retry bisa lebih lama.
 - **Transkrip kurang jelas:** tinjau subtitle dan suara; tulis caption manual. Mengulang model tidak memperbaiki transkrip sumber.
 
 Sumber teknis: [Qwen3 di Ollama](https://ollama.com/library/qwen3), [Ollama API](https://github.com/ollama/ollama/blob/main/docs/api.md).
+
+
+Uji model nyata pada laptop ini menghasilkan ringkasan topik untuk contoh kebiasaan olahraga dan keamanan email berbahasa Inggris. Contoh dana darurat menghasilkan caption relevan, tetapi ditolak validasi akhir karena kutipan pendukungnya kurang sesuai. Contoh transkrip kacau/repetitif ditolak oleh pemeriksaan awal. Ini contoh terbatas, bukan benchmark akurasi seluruh video.
+
+
+Bahasa caption ditetapkan dari mode studio, bukan tebakan model: `local → id`, `global_en → en`. Keluaran diperiksa memakai deteksi bahasa lokal; jika salah/tidak cukup jelas, AI diminta memperbaiki sekali. Jika tetap gagal, hasil ditolak tanpa menimpa caption sebelumnya. Deteksi teks pendek dapat menolak keluaran yang sebenarnya layak; editor manual tetap tersedia. Evidence mempertahankan bahasa transkrip, sehingga pada sumber berbeda bahasa tidak dipaksakan berbagi ejaan kata dengan caption terjemahan.
