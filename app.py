@@ -4,12 +4,13 @@ from datetime import datetime, timezone
 from collections import OrderedDict
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 from urllib.parse import urlparse
-from flask import Flask, request, jsonify, send_from_directory, render_template, redirect
+from flask import Flask, request, jsonify, send_from_directory, render_template, redirect, Response
 import imageio_ffmpeg
 from global_content import TOPICS, IDEAS, SOURCES
 from subtitle_styles import SUBTITLE_STYLES
 from local_caption import summarize, CaptionUnavailable, UnclearTranscript, inference_lock
 import watermark
+import kids_content
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
@@ -17,6 +18,8 @@ DATA.mkdir(exist_ok=True)
 WATERMARK_ASSETS = DATA / "watermark-assets"
 WATERMARK_ASSETS.mkdir(exist_ok=True)
 WATERMARK_PRESETS = DATA / "watermark-presets.json"
+KIDS_BRIEFS = DATA / "kids-briefs"
+KIDS_BRIEFS.mkdir(exist_ok=True)
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024**3
@@ -304,19 +307,194 @@ def too_large(error): return jsonify(error="File terlalu besar. Batas unggahan 2
 def health():
     with lock:
         active = sum(not job.get("done") for job in jobs.values())
-    return jsonify(app="klip-lokal", status="ok", active_jobs=active, active_caption=inference_lock.locked(), capabilities=["history_delete", "history_pagination", "global_en", "local_caption_ai", "caption_persistence"])
+    return jsonify(app="klip-lokal", status="ok", active_jobs=active, active_caption=inference_lock.locked(), capabilities=["history_delete", "history_pagination", "global_en", "local_caption_ai", "caption_persistence", "watermark", "kids_studio"])
 
 @app.get("/favicon.ico")
 def favicon(): return redirect("/static/favicon.svg", code=302)
 
 @app.get("/")
-def index(): return render_template("index.html", global_mode=False)
+def index(): return render_template("index.html", global_mode=False, kids_mode=False)
 
 @app.get("/global")
-def global_studio(): return render_template("index.html", global_mode=True, ideas=IDEAS, sources=SOURCES)
+def global_studio(): return render_template("index.html", global_mode=True, kids_mode=False, ideas=IDEAS, sources=SOURCES)
 
 @app.get("/api/global/ideas")
 def global_ideas(): return jsonify(ideas=IDEAS, sources=SOURCES, kind="editorial", updated="2026-11-04")
+
+@app.get("/kids")
+def kids_studio():
+    return render_template(
+        "index.html",
+        global_mode=False,
+        kids_mode=True,
+        ideas=kids_content.IDEAS,
+        categories=kids_content.CATEGORIES,
+        sources=kids_content.SOURCES,
+    )
+
+@app.get("/api/kids/ideas")
+def kids_ideas():
+    category = request.args.get("category", "").strip().lower()
+    ideas = kids_content.IDEAS
+    if category and category in kids_content.CATEGORIES:
+        ideas = [i for i in ideas if i.get("category") == category]
+    return jsonify(
+        ideas=ideas,
+        categories=kids_content.CATEGORIES,
+        sources=kids_content.SOURCES,
+        kind="editorial",
+        target="3–5 tahun · Bahasa Indonesia",
+        updated="2026-11-05"
+    )
+
+@app.get("/api/kids/briefs")
+def get_kids_briefs():
+    try:
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 10))
+        if page < 1 or not 1 <= page_size <= 50:
+            raise ValueError()
+    except ValueError:
+        return jsonify(error="Parameter halaman tidak valid."), 400
+    category = request.args.get("category", "").strip().lower() or None
+    if category and category not in kids_content.CATEGORIES:
+        category = None
+    with lock:
+        result = kids_content.list_briefs(KIDS_BRIEFS, page=page, page_size=page_size, category=category)
+    return jsonify(result), 200
+
+@app.before_request
+def limit_kids_brief_request():
+    if request.path.startswith("/api/kids/briefs") and request.method in ("POST", "PATCH"):
+        request.max_content_length = 32 * 1024
+
+@app.post("/api/kids/briefs")
+def create_kids_brief():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Body request harus berupa JSON."), 400
+    try:
+        validated = kids_content.validate_brief_payload(data, is_patch=False)
+    except kids_content.KidsBriefError as exc:
+        return jsonify(error=exc.message), exc.status_code
+
+    brief_id = uuid.uuid4().hex
+    now = datetime.now(timezone.utc).isoformat()
+    brief = {
+        "brief_id": brief_id,
+        "revision": 1,
+        "idea_id": validated.get("idea_id"),
+        "category": validated.get("category"),
+        "age_band": validated["age_band"],
+        "language": validated["language"],
+        "title": validated["title"],
+        "learning_goal": validated["learning_goal"],
+        "outline": validated["outline"],
+        "asset_notes": validated["asset_notes"],
+        "target_duration": validated["target_duration"],
+        "created_at": now,
+        "updated_at": now,
+    }
+    with lock:
+        try:
+            kids_content.save_brief_atomic(KIDS_BRIEFS, brief)
+        except OSError:
+            return jsonify(error="Gagal menyimpan brief ke disk."), 500
+    return jsonify(brief=brief), 201
+
+@app.get("/api/kids/briefs/<brief_id>")
+def get_kids_brief(brief_id):
+    if not kids_content.is_valid_brief_id(brief_id):
+        return jsonify(error="ID brief tidak valid."), 400
+    with lock:
+        brief = kids_content.read_brief(KIDS_BRIEFS, brief_id)
+    if brief is None:
+        return jsonify(error="Brief tidak ditemukan."), 404
+    return jsonify(brief=brief), 200
+
+@app.patch("/api/kids/briefs/<brief_id>")
+def update_kids_brief(brief_id):
+    if not kids_content.is_valid_brief_id(brief_id):
+        return jsonify(error="ID brief tidak valid."), 400
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Body request harus berupa JSON."), 400
+
+    expected_revision = data.get("expected_revision")
+    if type(expected_revision) is not int or expected_revision < 1:
+        return jsonify(error="Field 'expected_revision' wajib berupa integer positif."), 400
+
+    try:
+        validated = kids_content.validate_brief_payload(data, is_patch=True)
+    except kids_content.KidsBriefError as exc:
+        return jsonify(error=exc.message), exc.status_code
+
+    with lock:
+        current_brief = kids_content.read_brief(KIDS_BRIEFS, brief_id)
+        if current_brief is None:
+            return jsonify(error="Brief tidak ditemukan."), 404
+
+        if current_brief.get("revision", 1) != expected_revision:
+            return jsonify(
+                error="Konflik revisi brief. Versi server telah diperbarui oleh sesi lain.",
+                conflict=True,
+                current_revision=current_brief.get("revision", 1),
+                server_brief=current_brief,
+            ), 409
+
+        new_brief = copy.deepcopy(current_brief)
+        for key, val in validated.items():
+            new_brief[key] = val
+        new_brief["revision"] = current_brief.get("revision", 1) + 1
+        new_brief["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        try:
+            kids_content.save_brief_atomic(KIDS_BRIEFS, new_brief)
+        except OSError:
+            return jsonify(error="Gagal memperbarui brief ke disk."), 500
+
+    return jsonify(brief=new_brief), 200
+
+@app.delete("/api/kids/briefs/<brief_id>")
+def delete_kids_brief(brief_id):
+    if not kids_content.is_valid_brief_id(brief_id):
+        return jsonify(error="ID brief tidak valid."), 400
+    with lock:
+        brief = kids_content.read_brief(KIDS_BRIEFS, brief_id)
+        if brief is None:
+            return jsonify(error="Brief tidak ditemukan."), 404
+        deleted = kids_content.delete_brief(KIDS_BRIEFS, brief_id)
+    if not deleted:
+        return jsonify(error="Gagal menghapus brief."), 500
+    return jsonify(brief_id=brief_id, deleted=True), 200
+
+@app.get("/api/kids/briefs/<brief_id>/export")
+def export_kids_brief(brief_id):
+    if not kids_content.is_valid_brief_id(brief_id):
+        return jsonify(error="ID brief tidak valid."), 400
+    fmt = request.args.get("format", "txt").strip().lower()
+    with lock:
+        brief = kids_content.read_brief(KIDS_BRIEFS, brief_id)
+    if brief is None:
+        return jsonify(error="Brief tidak ditemukan."), 404
+
+    if fmt == "json":
+        response = Response(
+            json.dumps(brief, ensure_ascii=False, indent=2),
+            status=200,
+            mimetype="application/json"
+        )
+        response.headers["Content-Disposition"] = f'attachment; filename="brief-{brief_id}.json"'
+        return response
+    else:
+        text_content = kids_content.format_brief_txt(brief)
+        response = Response(
+            text_content,
+            status=200,
+            mimetype="text/plain; charset=utf-8"
+        )
+        response.headers["Content-Disposition"] = f'attachment; filename="brief-{brief_id}.txt"'
+        return response
 
 @app.post("/api/jobs")
 def create():
