@@ -79,6 +79,6 @@
   }
   document.addEventListener('pointerdown', event => { if (opened && !opened.wrap.contains(event.target)) close(); });
   document.addEventListener('focusin', event => { if (opened && !opened.wrap.contains(event.target)) close(); });
-  document.querySelector('#form').addEventListener('reset', () => { close(); queueMicrotask(refresh); });
+  document.querySelector('#form')?.addEventListener('reset', () => { close(); queueMicrotask(refresh); });
   window.KlipSelect = {refresh}; refresh();
 })();

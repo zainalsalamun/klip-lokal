@@ -17,8 +17,16 @@ function syncView() {
   historyNav.classList.toggle('active', showingHistory);
   historyNav.toggleAttribute('aria-current', showingHistory);
   if (showingHistory) historyNav.setAttribute('aria-current', 'page');
-  for (const nav of sidebar.querySelectorAll('.nav:not(.history-nav)')) nav.classList.toggle('active', !showingHistory && new URL(nav.href).pathname === location.pathname);
-  document.querySelector('header>span').textContent = 'Workspace / ' + (showingHistory ? 'Riwayat klip' : document.body.classList.contains('global-studio') ? 'Studio Global' : 'Studio klip');
+  for (const nav of sidebar.querySelectorAll('.nav:not(.history-nav)')) {
+    const isCurrent = (!showingHistory) && (
+      new URL(nav.href, location.href).pathname === location.pathname ||
+      (nav.getAttribute('href') === '/kids' && document.body.classList.contains('kids-studio')) ||
+      (nav.getAttribute('href') === '/global' && document.body.classList.contains('global-studio')) ||
+      (nav.getAttribute('href') === '/' && !document.body.classList.contains('kids-studio') && !document.body.classList.contains('global-studio'))
+    );
+    nav.classList.toggle('active', isCurrent);
+  }
+  document.querySelector('header>span').textContent = 'Workspace / ' + (showingHistory ? 'Riwayat klip' : document.body.classList.contains('kids-studio') ? 'Studio Anak' : document.body.classList.contains('global-studio') ? 'Studio Global' : 'Studio klip');
 }
 window.addEventListener('hashchange', () => { syncView(); setSidebar(false, false); window.scrollTo(0, 0); });
 syncView();
@@ -71,15 +79,28 @@ for (const filter of historyTools.querySelectorAll('[data-status]')) filter.addE
 document.querySelector('#history-prev').addEventListener('click', () => { historyState.page = Math.max(1, historyState.page-1); refreshHistory().catch(historyError); });
 document.querySelector('#history-next').addEventListener('click', () => { historyState.page = Math.min(historyState.pages, historyState.page+1); refreshHistory().catch(historyError); });
 const outputSizes = {480: '480 × 854', 720: '720 × 1280', 1080: '1080 × 1920'};
-function syncFormat() { window.KlipSelect?.refresh(); syncSubtitleStyle(); document.querySelector('#format-details').textContent = outputSizes[form.elements.resolution.value] + ' · MP4 · crop mengikuti pembicara'; }
-function syncSubtitleStyle() {
-  const select = form.elements.subtitle_style;
-  document.querySelector('.subtitle-preview').dataset.style = select.value;
-  document.querySelector('#subtitle-style-description').textContent = select.selectedOptions[0].dataset.description;
+function syncFormat() {
+  if (!form) return;
+  window.KlipSelect?.refresh();
+  syncSubtitleStyle();
+  const formatEl = document.querySelector('#format-details');
+  if (formatEl && form.elements.resolution) formatEl.textContent = outputSizes[form.elements.resolution.value] + ' · MP4 · crop mengikuti pembicara';
 }
-form.elements.subtitle_style.addEventListener('change', syncSubtitleStyle);
-syncSubtitleStyle();
-form.elements.resolution.addEventListener('change', syncFormat);
+function syncSubtitleStyle() {
+  if (!form) return;
+  const select = form.elements.subtitle_style;
+  const preview = document.querySelector('.subtitle-preview');
+  if (preview && select && select.selectedOptions[0]) {
+    preview.dataset.style = select.value;
+    const descEl = document.querySelector('#subtitle-style-description');
+    if (descEl) descEl.textContent = select.selectedOptions[0].dataset.description;
+  }
+}
+if (form) {
+  form.elements.subtitle_style.addEventListener('change', syncSubtitleStyle);
+  syncSubtitleStyle();
+  form.elements.resolution.addEventListener('change', syncFormat);
+}
 const connectionMessage = 'Server lokal tidak terhubung. Jalankan aplikasi, lalu muat ulang halaman.';
 
 class ConnectionError extends Error {}
@@ -105,9 +126,10 @@ function remember(id) {
   try { if (id) localStorage.setItem('klip-selected', id); else localStorage.removeItem('klip-selected'); } catch (_) {}
 }
 function showError(message) {
-  errorEl.textContent = message;
-  button.disabled = Boolean(activeJobId);
-  document.querySelector('#progress').hidden = false;
+  if (errorEl) errorEl.textContent = message;
+  if (button) button.disabled = Boolean(activeJobId);
+  const prog = document.querySelector('#progress');
+  if (prog) prog.hidden = false;
 }
 function formatTime(n) { return Math.floor(n/60) + ':' + String(Math.floor(n%60)).padStart(2, '0'); }
 function makeCaption(text, audience = 'local') {
@@ -128,7 +150,7 @@ function formatSaveTime(isoString) {
   return ' (' + d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}) + ')';
 }
 function hasUnsavedCaptionEdits() {
-  return Boolean(document.querySelector('.caption-editor.has-unsaved, .watermark-editor.has-unsaved'));
+  return Boolean(document.querySelector('.caption-editor.has-unsaved, .watermark-editor.has-unsaved, #kids-brief-section.has-unsaved'));
 }
 window.addEventListener('beforeunload', event => {
   if (hasUnsavedCaptionEdits()) {
@@ -1014,11 +1036,14 @@ function render(job) {
   });
 }
 function display(job) {
-  document.querySelector('#progress').hidden = false;
-  statusEl.textContent = job.status;
-  document.querySelector('#percent').textContent = (job.progress || 0) + '%';
-  document.querySelector('#bar').style.width = (job.progress || 0) + '%';
-  errorEl.textContent = job.error || '';
+  const progEl = document.querySelector('#progress');
+  if (progEl) progEl.hidden = false;
+  if (statusEl) statusEl.textContent = job.status;
+  const percEl = document.querySelector('#percent');
+  if (percEl) percEl.textContent = (job.progress || 0) + '%';
+  const barEl = document.querySelector('#bar');
+  if (barEl) barEl.style.width = (job.progress || 0) + '%';
+  if (errorEl) errorEl.textContent = job.error || '';
   render(job);
 }
 function selectHistoryRow() {
@@ -1169,16 +1194,21 @@ async function openJob(id) {
   try {
     const job = await api('/api/jobs/' + encodeURIComponent(id));
     if (version !== selectionVersion) return;
-    document.querySelector('#url').value = job.source_url || '';
-    document.querySelector('#video').value = '';
-    document.querySelector('#upload-label').textContent = '＋ Pilih file video';
-    for (const key of ['duration', 'count', 'language']) if (job[key] != null) form.elements[key].value = job[key];
-    form.elements.resolution.value = job.resolution || '720';
-    form.elements.subtitle_style.value = job.subtitle_style || 'classic';
-    if (form.elements.topic) form.elements.topic.value = job.topic || 'general';
-    syncFormat();
+    const urlInput = document.querySelector('#url');
+    if (urlInput) urlInput.value = job.source_url || '';
+    const vidInput = document.querySelector('#video');
+    if (vidInput) vidInput.value = '';
+    const uplLabel = document.querySelector('#upload-label');
+    if (uplLabel) uplLabel.textContent = '＋ Pilih file video';
+    if (form) {
+      for (const key of ['duration', 'count', 'language']) if (job[key] != null) form.elements[key].value = job[key];
+      form.elements.resolution.value = job.resolution || '720';
+      form.elements.subtitle_style.value = job.subtitle_style || 'classic';
+      if (form.elements.topic) form.elements.topic.value = job.topic || 'general';
+      syncFormat();
+    }
     display(job);
-    if (!job.done && !activeJobId) { activeJobId = id; button.disabled = true; poll(id); }
+    if (!job.done && !activeJobId) { activeJobId = id; if (button) button.disabled = true; poll(id); }
   } catch (error) { if (version === selectionVersion) showError(error instanceof ConnectionError ? connectionMessage : 'Hasil belum dapat ditampilkan: ' + error.message); }
 }
 async function poll(id) {
@@ -1189,7 +1219,7 @@ async function poll(id) {
     timer = setTimeout(() => poll(id), 4000); return;
   }
   if (job.done) {
-    activeJobId = null; button.disabled = false;
+    activeJobId = null; if (button) button.disabled = false;
     try { localStorage.removeItem('klip-job'); } catch (_) {}
   }
   try { if (selectedJobId === id) display(job); }
@@ -1199,64 +1229,661 @@ async function poll(id) {
   if (job.done) { refreshHistory().catch(historyError); return; }
   timer = setTimeout(() => poll(id), 1800);
 }
-document.querySelector('#video').addEventListener('change', event => {
-  document.querySelector('#upload-label').textContent = event.target.files[0]?.name || '＋ Pilih file video';
-  if (event.target.files.length) document.querySelector('#url').value = '';
-});
-document.querySelector('#url').addEventListener('input', event => {
-  if (event.target.value) { document.querySelector('#video').value = ''; document.querySelector('#upload-label').textContent = '＋ Pilih file video'; }
-});
-document.querySelector('#new-job').addEventListener('click', () => {
-  if (hasUnsavedCaptionEdits()) {
-    if (!window.confirm('Ada perubahan caption yang belum disimpan ke server. Tetap buat klip baru tanpa menyimpan?')) return;
-  }
-  history.replaceState(null, '', location.pathname + location.search); syncView(); window.scrollTo(0, 0);
-  ++selectionVersion; selectedJobId = null; remember(null); form.reset(); syncFormat();
-  document.querySelector('#upload-label').textContent = '＋ Pilih file video';
-  document.querySelector('#results').hidden = true;
-  document.querySelector('#progress').hidden = !activeJobId;
-  errorEl.textContent = '';
-  if (activeJobId) { statusEl.textContent = 'Ada video sedang diproses. Kamu bisa membuka hasil lama dari riwayat.'; document.querySelector('#percent').textContent = ''; }
-  button.disabled = Boolean(activeJobId); selectHistoryRow();
-  if (mobileWidth.matches) setSidebar(false, false);
-  document.querySelector('#url').focus();
-});
-form.addEventListener('submit', async event => {
-  event.preventDefault(); if (activeJobId) return;
-  button.disabled = true; errorEl.textContent = '';
-  document.querySelector('#progress').hidden = false; statusEl.textContent = 'Mengirim video…';
-  try {
-    if (form.elements.audience?.value === 'global_en') {
-      const health = await api('/api/health');
-      if (!health.capabilities?.includes('global_en')) throw Error('Studio Global memerlukan server versi baru. Setelah video aktif selesai, restart server lalu coba lagi.');
+const vidEl = document.querySelector('#video');
+if (vidEl) {
+  vidEl.addEventListener('change', event => {
+    const upl = document.querySelector('#upload-label');
+    if (upl) upl.textContent = event.target.files[0]?.name || '＋ Pilih file video';
+    if (event.target.files.length) {
+      const u = document.querySelector('#url');
+      if (u) u.value = '';
     }
-    const result = await api('/api/jobs', {method:'POST', body:new FormData(form)});
-    clearTimeout(timer); ++selectionVersion;
-    activeJobId = selectedJobId = result.id; remember(result.id);
-    try { localStorage.setItem('klip-job', result.id); } catch (_) {}
-    document.querySelector('#results').hidden = true;
-    document.querySelector('#percent').textContent = '0%'; document.querySelector('#bar').style.width = '0%';
-    poll(result.id);
-    historyState.page = 1; historyState.query = ''; historyState.status = 'all';
-    document.querySelector('#history-search').value = '';
-    refreshHistory().catch(() => { historyMessage.textContent = 'Riwayat belum dapat dimuat. Proses video tetap berjalan.'; });
-  } catch (error) { showError(error instanceof ConnectionError ? connectionMessage : error.message); }
-});
-for (const idea of document.querySelectorAll('.use-idea')) idea.addEventListener('click', () => {
-  form.elements.topic.value = idea.dataset.topic; form.elements.duration.value = idea.dataset.duration;
-  window.KlipSelect?.refresh();
-  document.querySelector('#idea-selected').textContent = 'Fokus dipilih: ' + idea.closest('.idea-card').querySelector('h3').textContent + '. Pilih video yang sesuai dengan fokus ini.';
-  form.scrollIntoView({behavior:'smooth', block:'center'}); document.querySelector('#url').focus({preventScroll:true});
-});
+  });
+}
+const urlEl = document.querySelector('#url');
+if (urlEl) {
+  urlEl.addEventListener('input', event => {
+    if (event.target.value) {
+      const v = document.querySelector('#video');
+      if (v) v.value = '';
+      const upl = document.querySelector('#upload-label');
+      if (upl) upl.textContent = '＋ Pilih file video';
+    }
+  });
+}
+const newJobBtn = document.querySelector('#new-job');
+if (newJobBtn) {
+  newJobBtn.addEventListener('click', () => {
+    if (hasUnsavedCaptionEdits()) {
+      if (!window.confirm('Ada perubahan caption yang belum disimpan ke server. Tetap buat klip baru tanpa menyimpan?')) return;
+    }
+    history.replaceState(null, '', location.pathname + location.search); syncView(); window.scrollTo(0, 0);
+    ++selectionVersion; selectedJobId = null; remember(null);
+    if (form) { form.reset(); syncFormat(); }
+    const upl = document.querySelector('#upload-label');
+    if (upl) upl.textContent = '＋ Pilih file video';
+    const resEl = document.querySelector('#results');
+    if (resEl) resEl.hidden = true;
+    const progEl = document.querySelector('#progress');
+    if (progEl) progEl.hidden = !activeJobId;
+    if (errorEl) errorEl.textContent = '';
+    if (activeJobId && statusEl) {
+      statusEl.textContent = 'Ada video sedang diproses. Kamu bisa membuka hasil lama dari riwayat.';
+      const perc = document.querySelector('#percent');
+      if (perc) perc.textContent = '';
+    }
+    if (button) button.disabled = Boolean(activeJobId); selectHistoryRow();
+    if (mobileWidth.matches) setSidebar(false, false);
+    const u = document.querySelector('#url');
+    if (u) u.focus();
+  });
+}
+if (form) {
+  form.addEventListener('submit', async event => {
+    event.preventDefault(); if (activeJobId) return;
+    if (button) button.disabled = true;
+    if (errorEl) errorEl.textContent = '';
+    const progEl = document.querySelector('#progress');
+    if (progEl) progEl.hidden = false;
+    if (statusEl) statusEl.textContent = 'Mengirim video…';
+    try {
+      if (form.elements.audience?.value === 'global_en') {
+        const health = await api('/api/health');
+        if (!health.capabilities?.includes('global_en')) throw Error('Studio Global memerlukan server versi baru. Setelah video aktif selesai, restart server lalu coba lagi.');
+      }
+      const result = await api('/api/jobs', {method:'POST', body:new FormData(form)});
+      clearTimeout(timer); ++selectionVersion;
+      activeJobId = selectedJobId = result.id; remember(result.id);
+      try { localStorage.setItem('klip-job', result.id); } catch (_) {}
+      const resEl = document.querySelector('#results');
+      if (resEl) resEl.hidden = true;
+      const perc = document.querySelector('#percent');
+      if (perc) perc.textContent = '0%';
+      const bar = document.querySelector('#bar');
+      if (bar) bar.style.width = '0%';
+      poll(result.id);
+      historyState.page = 1; historyState.query = ''; historyState.status = 'all';
+      const sInput = document.querySelector('#history-search');
+      if (sInput) sInput.value = '';
+      refreshHistory().catch(() => { historyMessage.textContent = 'Riwayat belum dapat dimuat. Proses video tetap berjalan.'; });
+    } catch (error) { showError(error instanceof ConnectionError ? connectionMessage : error.message); }
+  });
+}
+for (const idea of document.querySelectorAll('.use-idea')) {
+  idea.addEventListener('click', () => {
+    if (!form) return;
+    form.elements.topic.value = idea.dataset.topic; form.elements.duration.value = idea.dataset.duration;
+    window.KlipSelect?.refresh();
+    const isel = document.querySelector('#idea-selected');
+    if (isel) isel.textContent = 'Fokus dipilih: ' + idea.closest('.idea-card').querySelector('h3').textContent + '. Pilih video yang sesuai dengan fokus ini.';
+    form.scrollIntoView({behavior:'smooth', block:'center'});
+    const u = document.querySelector('#url');
+    if (u) u.focus({preventScroll:true});
+  });
+}
+
+function initKidsStudio() {
+  const briefPanel = document.querySelector('#kids-brief-section');
+  if (!briefPanel) return;
+
+  const titleInput = document.querySelector('#brief-title');
+  const catSelect = document.querySelector('#brief-category');
+  const durSelect = document.querySelector('#brief-duration');
+  const goalInput = document.querySelector('#brief-goal');
+  const outlineInput = document.querySelector('#brief-outline');
+  const assetsInput = document.querySelector('#brief-assets');
+  const briefIdInput = document.querySelector('#brief-id');
+  const revisionInput = document.querySelector('#brief-revision');
+  const ideaIdInput = document.querySelector('#brief-idea-id');
+  const statusTag = document.querySelector('#brief-status-tag');
+  const feedback = document.querySelector('#brief-feedback');
+  const conflictBanner = document.querySelector('#brief-conflict-banner');
+  const useServerBtn = document.querySelector('#brief-use-server-btn');
+  const keepLocalBtn = document.querySelector('#brief-keep-local-btn');
+  const saveBtn = document.querySelector('#save-brief-btn');
+  const copyBtn = document.querySelector('#copy-brief-btn');
+  const exportTxtBtn = document.querySelector('#export-txt-btn');
+  const exportJsonBtn = document.querySelector('#export-json-btn');
+  const deleteBtn = document.querySelector('#delete-brief-btn');
+  const newBriefBtn = document.querySelector('#new-brief-btn');
+  const savedBriefsList = document.querySelector('#saved-briefs-list');
+  const savedBriefsStatus = document.querySelector('#saved-briefs-status');
+  const savedBriefsCount = document.querySelector('#saved-briefs-count');
+  const pagination = document.querySelector('#briefs-pagination');
+  const prevBtn = document.querySelector('#briefs-prev-btn');
+  const nextBtn = document.querySelector('#briefs-next-btn');
+  const pageInfo = document.querySelector('#briefs-page-info');
+
+  const titleCount = document.querySelector('#title-count');
+  const goalCount = document.querySelector('#goal-count');
+  const outlineCount = document.querySelector('#outline-count');
+  const assetsCount = document.querySelector('#assets-count');
+
+  let currentBriefId = null;
+  let serverRevision = 1;
+  let savedBrief = null;
+  let conflictBrief = null;
+  let isSaving = false;
+  let isDirty = false;
+  let briefsPage = 1;
+  let briefsTotalPages = 1;
+
+  function setBriefBusy(busy) {
+    isSaving = busy;
+    // Lock form and context switches until the response belongs to this editor again.
+    document.querySelectorAll('#kids-brief-section input, #kids-brief-section select, #kids-brief-section textarea, #kids-brief-section button, .use-kids-idea, .btn-load-brief, #new-brief-btn').forEach(el => {
+      el.disabled = busy;
+    });
+    if (window.KlipSelect) window.KlipSelect.refresh();
+  }
+  document.addEventListener('click', event => {
+    const link = event.target.closest('a[href]');
+    if (!link || (!isDirty && !isSaving) || link.target === '_blank') return;
+    const target = new URL(link.href, location.href);
+    if (target.origin !== location.origin) return;
+    if (isSaving || !window.confirm('Ada perubahan brief yang belum disimpan. Tetap tinggalkan editor?')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
+
+  function updateCounts() {
+    if (titleCount && titleInput) titleCount.textContent = `(${titleInput.value.length}/120)`;
+    if (goalCount && goalInput) goalCount.textContent = `(${goalInput.value.length}/300)`;
+    if (outlineCount && outlineInput) outlineCount.textContent = `(${outlineInput.value.length}/2000)`;
+    if (assetsCount && assetsInput) assetsCount.textContent = `(${assetsInput.value.length}/2000)`;
+  }
+
+  function markDirty() {
+    isDirty = true;
+    briefPanel.classList.add('has-unsaved');
+    if (statusTag) {
+      statusTag.textContent = currentBriefId ? 'Ada perubahan belum disimpan' : 'Draft baru (belum disimpan)';
+      statusTag.className = 'status-dirty';
+    }
+  }
+
+  function markSaved() {
+    isDirty = false;
+    briefPanel.classList.remove('has-unsaved');
+    if (statusTag) {
+      statusTag.textContent = `Tersimpan (Revisi ${serverRevision})`;
+      statusTag.className = 'status-saved';
+    }
+  }
+
+  function setFeedback(msg, type = 'info') {
+    if (!feedback) return;
+    feedback.textContent = msg;
+    feedback.className = `brief-feedback brief-feedback-${type}`;
+    if (!msg) feedback.style.display = 'none';
+    else feedback.style.display = 'block';
+  }
+
+  for (const input of [titleInput, goalInput, outlineInput, assetsInput]) {
+    if (input) {
+      input.addEventListener('input', () => {
+        updateCounts();
+        markDirty();
+      });
+    }
+  }
+  for (const sel of [catSelect, durSelect]) {
+    if (sel) {
+      sel.addEventListener('change', () => {
+        markDirty();
+      });
+    }
+  }
+
+  const filterBtns = document.querySelectorAll('.kids-filter-btn');
+  const ideaCards = document.querySelectorAll('.kids-idea-card');
+  const emptyEl = document.querySelector('#kids-ideas-empty');
+
+  for (const btn of filterBtns) {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-pressed', 'false');
+      });
+      btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
+      const cat = btn.dataset.category;
+      let visibleCount = 0;
+      ideaCards.forEach(card => {
+        const matches = cat === 'all' || card.dataset.category === cat;
+        card.hidden = !matches;
+        if (matches) visibleCount++;
+      });
+      if (emptyEl) emptyEl.hidden = visibleCount > 0;
+    });
+  }
+
+  document.querySelectorAll('.use-kids-idea').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (isSaving) return;
+      if (isDirty && !window.confirm('Ada perubahan brief yang belum disimpan. Tetap ganti dengan ide baru?')) {
+        return;
+      }
+      currentBriefId = null;
+      serverRevision = 1;
+      savedBrief = null;
+      conflictBrief = null;
+      if (conflictBanner) conflictBanner.hidden = true;
+      if (deleteBtn) deleteBtn.style.display = 'none';
+
+      if (titleInput) titleInput.value = btn.dataset.title || '';
+      if (goalInput) goalInput.value = btn.dataset.goal || '';
+      if (catSelect) catSelect.value = btn.dataset.category || 'warna';
+      if (durSelect) durSelect.value = btn.dataset.duration || '30';
+      if (outlineInput) outlineInput.value = btn.dataset.outline || '';
+      if (assetsInput) assetsInput.value = btn.dataset.assets || '';
+      if (briefIdInput) briefIdInput.value = '';
+      if (revisionInput) revisionInput.value = '1';
+      if (ideaIdInput) ideaIdInput.value = btn.dataset.ideaId || '';
+
+      if (window.KlipSelect) window.KlipSelect.refresh();
+      updateCounts();
+      markDirty();
+      setFeedback('Ide berhasil dimuat ke editor. Lengkapi rencana lalu klik Simpan brief.', 'info');
+      briefPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (titleInput) titleInput.focus();
+    });
+  });
+
+  async function saveBrief() {
+    if (isSaving) return;
+    const title = titleInput?.value.trim() || '';
+    if (!title) {
+      setFeedback('Judul brief wajib diisi.', 'error');
+      if (titleInput) titleInput.focus();
+      return;
+    }
+    if (title.length > 120) {
+      setFeedback('Judul brief maksimal 120 karakter.', 'error');
+      if (titleInput) titleInput.focus();
+      return;
+    }
+
+    setBriefBusy(true);
+    setFeedback('Menyimpan brief…', 'loading');
+
+    const payload = {
+      title,
+      learning_goal: goalInput?.value.trim() || '',
+      category: catSelect?.value || 'warna',
+      target_duration: parseInt(durSelect?.value || '30', 10),
+      outline: outlineInput?.value.trim() || '',
+      asset_notes: assetsInput?.value.trim() || '',
+      idea_id: ideaIdInput?.value.trim() || null,
+    };
+
+    try {
+      let res;
+      if (currentBriefId) {
+        payload.expected_revision = serverRevision;
+        res = await api(`/api/kids/briefs/${encodeURIComponent(currentBriefId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        res = await api('/api/kids/briefs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      currentBriefId = res.brief.brief_id;
+      serverRevision = res.brief.revision;
+      savedBrief = res.brief;
+      if (briefIdInput) briefIdInput.value = currentBriefId;
+      if (revisionInput) revisionInput.value = serverRevision;
+      if (deleteBtn) deleteBtn.style.display = 'inline-block';
+      if (conflictBanner) conflictBanner.hidden = true;
+
+      markSaved();
+      setFeedback(`Brief tersimpan (Revisi ${serverRevision}).`, 'success');
+      loadSavedBriefs(briefsPage);
+    } catch (err) {
+      if (err.cause?.status === 409 || err.message?.includes('409') || err.message?.includes('Konflik')) {
+        try {
+          const sres = await api(`/api/kids/briefs/${encodeURIComponent(currentBriefId)}`);
+          conflictBrief = sres.brief;
+        } catch (_) {}
+        if (conflictBanner) conflictBanner.hidden = false;
+        setFeedback('Konflik revisi: Versi server telah diperbarui oleh sesi lain.', 'warning');
+      } else {
+        setFeedback('Gagal menyimpan brief: ' + err.message, 'error');
+      }
+    } finally {
+      setBriefBusy(false);
+    }
+  }
+
+  if (saveBtn) saveBtn.addEventListener('click', saveBrief);
+
+  if (useServerBtn) {
+    useServerBtn.addEventListener('click', () => {
+      if (!conflictBrief) return;
+      loadBriefToForm(conflictBrief);
+      if (conflictBanner) conflictBanner.hidden = true;
+      setFeedback('Versi server dimuat ke editor.', 'info');
+    });
+  }
+  if (keepLocalBtn) {
+    keepLocalBtn.addEventListener('click', () => {
+      if (conflictBrief) {
+        serverRevision = conflictBrief.revision;
+        if (revisionInput) revisionInput.value = serverRevision;
+      }
+      if (conflictBanner) conflictBanner.hidden = true;
+      setFeedback('Tetap di edit lokal. Klik Simpan brief untuk menyimpan kembali.', 'info');
+    });
+  }
+
+  function loadBriefToForm(b) {
+    currentBriefId = b.brief_id;
+    serverRevision = b.revision;
+    savedBrief = b;
+    conflictBrief = null;
+
+    if (briefIdInput) briefIdInput.value = b.brief_id;
+    if (revisionInput) revisionInput.value = b.revision;
+    if (ideaIdInput) ideaIdInput.value = b.idea_id || '';
+    if (titleInput) titleInput.value = b.title || '';
+    if (goalInput) goalInput.value = b.learning_goal || '';
+    if (catSelect) catSelect.value = b.category || 'warna';
+    if (durSelect) durSelect.value = String(b.target_duration || 30);
+    if (outlineInput) outlineInput.value = b.outline || '';
+    if (assetsInput) assetsInput.value = b.asset_notes || '';
+
+    if (window.KlipSelect) window.KlipSelect.refresh();
+    updateCounts();
+    markSaved();
+    if (deleteBtn) deleteBtn.style.display = 'inline-block';
+    if (conflictBanner) conflictBanner.hidden = true;
+  }
+
+  if (newBriefBtn) {
+    newBriefBtn.addEventListener('click', () => {
+      if (isSaving) return;
+      if (isDirty && !window.confirm('Ada perubahan brief yang belum disimpan. Tetap buat brief baru?')) {
+        return;
+      }
+      currentBriefId = null;
+      serverRevision = 1;
+      savedBrief = null;
+      conflictBrief = null;
+      isDirty = false;
+      briefPanel.classList.remove('has-unsaved');
+      if (briefIdInput) briefIdInput.value = '';
+      if (revisionInput) revisionInput.value = '1';
+      if (ideaIdInput) ideaIdInput.value = '';
+      if (titleInput) titleInput.value = '';
+      if (goalInput) goalInput.value = '';
+      if (catSelect) catSelect.value = 'warna';
+      if (durSelect) durSelect.value = '30';
+      if (outlineInput) outlineInput.value = '';
+      if (assetsInput) assetsInput.value = '';
+      updateCounts();
+      if (statusTag) {
+        statusTag.textContent = 'Draft baru (belum disimpan)';
+        statusTag.className = '';
+      }
+      if (deleteBtn) deleteBtn.style.display = 'none';
+      if (conflictBanner) conflictBanner.hidden = true;
+      setFeedback('', 'info');
+      if (window.KlipSelect) window.KlipSelect.refresh();
+      if (titleInput) titleInput.focus();
+    });
+  }
+
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async () => {
+      if (!currentBriefId) return;
+      if (!window.confirm('Hapus brief ini secara permanen?')) return;
+      deleteBtn.disabled = true;
+      try {
+        await api(`/api/kids/briefs/${encodeURIComponent(currentBriefId)}`, { method: 'DELETE' });
+        setFeedback('Brief berhasil dihapus.', 'info');
+        if (newBriefBtn) newBriefBtn.click();
+        loadSavedBriefs(1);
+      } catch (err) {
+        setFeedback('Gagal menghapus brief: ' + err.message, 'error');
+      } finally {
+        deleteBtn.disabled = false;
+      }
+    });
+  }
+
+  function getBriefTxtString() {
+    const title = titleInput?.value.trim() || 'Brief Tanpa Judul';
+    const catLabel = catSelect?.selectedOptions[0]?.textContent || catSelect?.value || 'Warna';
+    const dur = durSelect?.value || '30';
+    const goal = goalInput?.value.trim() || '-';
+    const outline = outlineInput?.value.trim() || '-';
+    const assets = assetsInput?.value.trim() || '-';
+    const ideaRef = ideaIdInput?.value.trim() || 'Kustom (orisinal)';
+    const rev = serverRevision || 1;
+    const now = new Date().toISOString();
+
+    return [
+      '='.repeat(80),
+      'BRIEF PRODUKSI KONTEN ANAK (3–5 TAHUN · BAHASA INDONESIA)',
+      'Klip Lokal — Studio Anak',
+      '='.repeat(80),
+      `Judul Kerja      : ${title}`,
+      `Target Usia      : 3–5 tahun`,
+      `Bahasa           : Bahasa Indonesia`,
+      `Target Durasi    : ${dur} detik`,
+      `Kategori         : ${catLabel}`,
+      `Tujuan Belajar   : ${goal}`,
+      `Referensi Ide    : ${ideaRef}`,
+      `Revisi Brief     : ${rev}`,
+      `Terakhir Diubah  : ${now}`,
+      '',
+      '-'.repeat(80),
+      'OUTLINE PRODUKSI (Pembukaan – Kegiatan – Penutup)',
+      '-'.repeat(80),
+      outline,
+      '',
+      '-'.repeat(80),
+      'CATATAN ASET & SUMBER REKAMAN',
+      '-'.repeat(80),
+      assets,
+      '',
+      '-'.repeat(80),
+      'PANDUAN KUALITAS & KEBIJAKAN PLATFORM',
+      '-'.repeat(80),
+      '• Satu konsep dan jawaban yang jelas per klip; beri konteks sebelum pertanyaan.',
+      '• Narasi bahasa Indonesia sederhana dan sesuai dengan objek yang benar-benar ditampilkan.',
+      '• Tempo visual tenang, tanpa efek cepat, suara mengejutkan, atau loop tanpa akhir.',
+      '• Tidak meminta data diri anak atau ajakan komentar publik (sesuai prinsip Made for Kids).',
+      '• Menggunakan aset rekaman orisinal atau berizin resmi.',
+      '='.repeat(80),
+    ].join('\n');
+  }
+
+  function downloadFile(content, mimeType, filename) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  }
+
+  function slugify(text) {
+    return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'brief';
+  }
+
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const text = getBriefTxtString();
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        setFeedback('Teks brief disalin ke clipboard.', 'success');
+      } catch (err) {
+        setFeedback('Gagal menyalin: ' + err.message, 'error');
+      }
+    });
+  }
+
+  if (exportTxtBtn) {
+    exportTxtBtn.addEventListener('click', () => {
+      const text = getBriefTxtString();
+      const filename = `brief-${slugify(titleInput?.value.trim() || '')}.txt`;
+      downloadFile(text, 'text/plain;charset=utf-8', filename);
+      setFeedback('File TXT berhasil diunduh.', 'success');
+    });
+  }
+
+  if (exportJsonBtn) {
+    exportJsonBtn.addEventListener('click', () => {
+      const dataObj = {
+        brief_id: currentBriefId,
+        revision: serverRevision,
+        idea_id: ideaIdInput?.value.trim() || null,
+        title: titleInput?.value.trim() || 'Brief Tanpa Judul',
+        category: catSelect?.value || 'warna',
+        age_band: '3_5',
+        language: 'id',
+        target_duration: parseInt(durSelect?.value || '30', 10),
+        learning_goal: goalInput?.value.trim() || '',
+        outline: outlineInput?.value.trim() || '',
+        asset_notes: assetsInput?.value.trim() || '',
+        exported_at: new Date().toISOString(),
+      };
+      const jsonStr = JSON.stringify(dataObj, null, 2);
+      const filename = `brief-${slugify(titleInput?.value.trim() || '')}.json`;
+      downloadFile(jsonStr, 'application/json;charset=utf-8', filename);
+      setFeedback('File JSON berhasil diunduh.', 'success');
+    });
+  }
+
+  async function loadSavedBriefs(page = 1) {
+    if (!savedBriefsList) return;
+    if (savedBriefsStatus) {
+      savedBriefsStatus.hidden = false;
+      savedBriefsStatus.textContent = 'Memuat daftar brief…';
+    }
+
+    try {
+      const data = await api(`/api/kids/briefs?page=${page}&page_size=6`);
+      briefsPage = data.page;
+      briefsTotalPages = data.total_pages;
+
+      if (savedBriefsCount) savedBriefsCount.textContent = String(data.total);
+
+      if (!data.briefs.length) {
+        savedBriefsList.innerHTML = '<p class="saved-briefs-empty">Belum ada brief tersimpan. Mulai dari ide di atas atau buat brief baru.</p>';
+        if (savedBriefsStatus) savedBriefsStatus.hidden = true;
+        if (pagination) pagination.hidden = true;
+        return;
+      }
+
+      if (savedBriefsStatus) savedBriefsStatus.hidden = true;
+      savedBriefsList.innerHTML = '';
+
+      for (const b of data.briefs) {
+        const item = document.createElement('article');
+        item.className = 'saved-brief-item';
+        if (b.brief_id === currentBriefId) item.classList.add('active');
+
+        const catName = catSelect?.querySelector(`option[value="${b.category}"]`)?.textContent || b.category;
+        const updated = b.updated_at ? new Date(b.updated_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+
+        const top = document.createElement('div'); top.className = 'saved-brief-top';
+        for (const [cls, value] of [['brief-cat-pill', catName], ['brief-dur-pill', `${b.target_duration}s`], ['brief-rev-pill', `Rev ${b.revision}`]]) {
+          const el = document.createElement('span'); el.className = cls; el.textContent = value; top.append(el);
+        }
+        const heading = document.createElement('h4'); heading.textContent = b.title;
+        item.append(top, heading);
+        if (b.learning_goal) {
+          const goal = document.createElement('p'); goal.className = 'saved-brief-goal'; goal.textContent = b.learning_goal; item.append(goal);
+        }
+        const bottom = document.createElement('div'); bottom.className = 'saved-brief-bottom';
+        const time = document.createElement('time'); time.textContent = updated;
+        const load = document.createElement('button'); load.type = 'button'; load.className = 'btn-load-brief';
+        load.dataset.id = b.brief_id; load.textContent = 'Buka di editor ↗'; load.disabled = isSaving;
+        bottom.append(time, load); item.append(bottom);
+
+        item.querySelector('.btn-load-brief').addEventListener('click', () => {
+          if (isSaving) return;
+      if (isDirty && !window.confirm('Ada perubahan brief yang belum disimpan. Tetap buka brief lain?')) {
+            return;
+          }
+          loadBriefToForm(b);
+          document.querySelectorAll('.saved-brief-item').forEach(el => el.classList.remove('active'));
+          item.classList.add('active');
+          briefPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
+        savedBriefsList.appendChild(item);
+      }
+
+      if (pagination) {
+        pagination.hidden = briefsTotalPages <= 1;
+        if (pageInfo) pageInfo.textContent = `${briefsPage} / ${briefsTotalPages}`;
+        if (prevBtn) prevBtn.disabled = briefsPage <= 1;
+        if (nextBtn) nextBtn.disabled = briefsPage >= briefsTotalPages;
+      }
+    } catch (err) {
+      if (savedBriefsStatus) {
+        savedBriefsStatus.hidden = false;
+        savedBriefsStatus.textContent = 'Gagal memuat brief: ' + err.message;
+      }
+    }
+  }
+
+  if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+      if (briefsPage > 1) loadSavedBriefs(briefsPage - 1);
+    });
+  }
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      if (briefsPage < briefsTotalPages) loadSavedBriefs(briefsPage + 1);
+    });
+  }
+
+  updateCounts();
+  loadSavedBriefs(1);
+}
+
 async function init() {
   try {
     const jobs = await refreshHistory();
     const active = jobs.find(job => !job.done);
-    activeJobId = historyState.activeId || active?.id || null; button.disabled = Boolean(activeJobId);
+    activeJobId = historyState.activeId || active?.id || null;
+    if (button) button.disabled = Boolean(activeJobId);
     let saved; try { saved = localStorage.getItem('klip-selected') || localStorage.getItem('klip-job'); } catch (_) {}
     const selectedId = saved || activeJobId || jobs[0]?.id;
-    if (selectedId && location.hash !== '#history') await openJob(selectedId);
-    if (activeJobId) poll(activeJobId);
-  } catch (error) { historyMessage.textContent = error instanceof ConnectionError ? connectionMessage : 'Riwayat tidak dapat dimuat: ' + error.message; }
+    if (selectedId && location.hash !== '#history' && !document.body.classList.contains('kids-studio')) {
+      await openJob(selectedId);
+    }
+    if (activeJobId && !document.body.classList.contains('kids-studio')) poll(activeJobId);
+  } catch (error) {
+    if (historyMessage) historyMessage.textContent = error instanceof ConnectionError ? connectionMessage : 'Riwayat tidak dapat dimuat: ' + error.message;
+  }
+  if (document.body.classList.contains('kids-studio') || document.querySelector('#kids-brief-section')) {
+    initKidsStudio();
+  }
 }
 init();
