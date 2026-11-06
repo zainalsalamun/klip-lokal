@@ -1,6 +1,6 @@
 // Keep real selects as the form data source; render accessible, themed menus.
 (() => {
-  const controls = [];
+  const controls = new Set();
   let opened = null;
   function close() {
     if (!opened) return;
@@ -10,7 +10,8 @@
     opened.wrap.classList.remove('is-open', 'opens-up');
     opened = null;
   }
-  for (const select of document.querySelectorAll('.options select')) {
+  function enhance(select) {
+    if (select.parentElement.classList.contains('custom-select')) return;
     const label = document.querySelector(`label[for="${select.id}"]`);
     const wrap = document.createElement('div'); wrap.className = 'custom-select';
     const trigger = document.createElement('button'); trigger.type = 'button'; trigger.className = 'select-trigger';
@@ -26,7 +27,7 @@
       trigger.setAttribute('aria-labelledby', label.id); menu.setAttribute('aria-labelledby', label.id);
     }
     select.before(wrap); wrap.append(select, trigger, menu); select.hidden = true;
-    const control = {select, wrap, trigger, menu, text, active: select.selectedIndex}; controls.push(control);
+    const control = {select, wrap, trigger, menu, text, active: select.selectedIndex}; controls.add(control);
     function highlight(index) {
       control.active = Math.max(0, Math.min(select.options.length-1, index));
       [...menu.children].forEach((item, i) => item.classList.toggle('highlighted', i === control.active));
@@ -71,7 +72,12 @@
     select.addEventListener('change', refresh);
   }
   function refresh() {
+    if (opened && !opened.wrap.isConnected) close();
     for (const control of controls) {
+      if (!control.wrap.isConnected) {
+        controls.delete(control);
+        continue;
+      }
       control.text.textContent = control.select.selectedOptions[0]?.textContent || '';
       control.trigger.disabled = control.select.disabled;
       [...control.menu.children].forEach((row, i) => row.setAttribute('aria-selected', String(i === control.select.selectedIndex)));
@@ -80,5 +86,10 @@
   document.addEventListener('pointerdown', event => { if (opened && !opened.wrap.contains(event.target)) close(); });
   document.addEventListener('focusin', event => { if (opened && !opened.wrap.contains(event.target)) close(); });
   document.querySelector('#form')?.addEventListener('reset', () => { close(); queueMicrotask(refresh); });
-  window.KlipSelect = {refresh}; refresh();
+  function mount(root) {
+    root.querySelectorAll('.options select, .thumbnail-ratio').forEach(enhance);
+    refresh();
+  }
+  window.KlipSelect = {mount, refresh};
+  mount(document);
 })();

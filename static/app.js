@@ -1021,7 +1021,7 @@ function watermarkEditor(clip, index, jobId) {
   box.append(header, statusBadge, conflictBanner, body, actions, exportNote);
   return box;
 }
-function clipOutputTools(clip, job) {
+function clipOutputTools(clip, job, index) {
   const box = document.createElement('section'); box.className = 'clip-output-tools';
   const title = document.createElement('h3'); title.textContent = 'Tinjau & ekspor versi baru';
   const note = document.createElement('p'); note.textContent = 'Tinjau video, edit caption dan simpan watermark di atas. Trim/subtitle manual belum tersedia. Thumbnail dibuat dari frame klip ini; tanpa ilustrasi atau judul buatan.';
@@ -1029,11 +1029,11 @@ function clipOutputTools(clip, job) {
   const frame = document.createElement('input'); frame.type = 'number'; frame.min = '0'; frame.step = '0.1'; frame.value = '0';
   frameLabel.append(frame);
   const ratioLabel = document.createElement('label'); ratioLabel.textContent = 'Rasio thumbnail';
-  const ratio = document.createElement('select');
+  const ratio = document.createElement('select'); ratio.className = 'thumbnail-ratio';
+  ratio.id = 'thumbnail-ratio-' + index; ratioLabel.htmlFor = ratio.id;
   for (const [value, text] of [['vertical', 'Cover 9:16 · 1080 × 1920'], ['landscape', 'Thumbnail 16:9 · 1280 × 720']]) {
     const option = document.createElement('option'); option.value = value; option.textContent = text; ratio.append(option);
   }
-  ratioLabel.append(ratio);
   const actions = document.createElement('div'); actions.className = 'watermark-actions';
   const video = document.createElement('button'); video.type = 'button'; video.textContent = 'Ekspor MP4 watermark';
   const image = document.createElement('button'); image.type = 'button'; image.textContent = 'Buat thumbnail PNG';
@@ -1080,7 +1080,7 @@ function clipOutputTools(clip, job) {
     finally { busy = false; video.disabled = image.disabled = false; }
   }
   video.addEventListener('click', () => start('video')); image.addEventListener('click', () => start('thumbnail'));
-  actions.append(video, image); box.append(title, note, frameLabel, ratioLabel, actions, status, list);
+  actions.append(video, image); box.append(title, note, frameLabel, ratioLabel, ratio, actions, status, list);
   for (const record of Object.values(clip.exports || {})) {
     if (record.status === 'running') follow(record).catch(error => { status.textContent = error.message; });
     else showRecord(record);
@@ -1122,8 +1122,9 @@ function render(job) {
     const qualityInfo = c.quality || c.framing?.quality;
     quality.hidden = !qualityInfo?.warning;
     quality.textContent = qualityInfo?.warning || '';
-    card.append(video, heading, time, framing, quality, text, download, captionEditor(c, i, job.id, job.audience), watermarkEditor(c, i, job.id), clipOutputTools(c, job)); grid.append(card);
+    card.append(video, heading, time, framing, quality, text, download, captionEditor(c, i, job.id, job.audience), watermarkEditor(c, i, job.id), clipOutputTools(c, job, i)); grid.append(card);
   });
+  window.KlipSelect?.mount(grid);
 }
 function display(job) {
   const progEl = document.querySelector('#progress');
