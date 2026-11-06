@@ -157,3 +157,8 @@ Membuka riwayat pekerjaan lain dari form sumber Studio Anak tidak mengubah pilih
 Hasil baru menampilkan resolusi/FPS sumber aktual dan peringatan upscale jika pembesaran lebih dari5%. Contoh sumber640×360 yang diekspor1080×1920 tetap tidak mempunyai detail1080p asli. Untuk crop portrait dari sumber landscape, bahkan sumber1080p dapat memerlukan pembesaran. Hasil lama tidak diunduh/dirender ulang otomatis.
 
 Crop baru memakai trajectory per-frame; analisis pembicara tetap heuristik4Hz. Encoding baru memakai Lanczos dan H.264fast/CRF18 untuk menjaga detail, dengan kemungkinan file lebih besar/waktu render lebih lama. Ekspor watermark mengikuti pengaturan kualitas ini. Sesudah memperbarui source, restart server ketika idle lalu refresh browser sebelum memulai pekerjaan baru.
+
+
+### Jarak crop
+
+**Lebih lebar · latar blur** adalah pilihan awal untuk pekerjaan baru dari form. Gambar utama memakai sekitar 80% tinggi kanvas sehingga pembicara terlihat lebih kecil dan lebih banyak bagian samping masuk pada video landscape. Latar mengisi kanvas 9:16; pelacakan tetap bekerja pada gambar utama. Pilih **Layar penuh · lebih dekat** untuk framing sebelumnya. Perubahan ini tidak merender ulang hasil lama.

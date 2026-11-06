@@ -84,7 +84,7 @@ function syncFormat() {
   window.KlipSelect?.refresh();
   syncSubtitleStyle();
   const formatEl = document.querySelector('#format-details');
-  if (formatEl && form.elements.resolution) formatEl.textContent = outputSizes[form.elements.resolution.value] + ' · MP4 · ' + 'crop mengikuti pembicara';
+  if (formatEl && form.elements.resolution) formatEl.textContent = outputSizes[form.elements.resolution.value] + ' · MP4 · ' + (form.elements.framing_layout?.value === 'wide' ? 'crop lebih lebar' : 'crop layar penuh');
 }
 function syncSubtitleStyle() {
   if (!form) return;
@@ -102,6 +102,7 @@ if (form) {
   if (form.dataset.kidsDuration) form.elements.duration.value = form.dataset.kidsDuration;
   window.KlipSelect?.refresh();
   form.elements.resolution.addEventListener('change', syncFormat);
+  form.elements.framing_layout?.addEventListener('change', syncFormat);
   syncFormat();
 }
 const connectionMessage = 'Server lokal tidak terhubung. Jalankan aplikasi, lalu muat ulang halaman.';
@@ -1300,6 +1301,7 @@ async function openJob(id) {
         else if (job[key] != null) form.elements[key].value = job[key];
       }
       form.elements.resolution.value = job.resolution || '720';
+      if (form.elements.framing_layout) form.elements.framing_layout.value = job.framing_layout || 'wide';
       if (form.elements.source_quality) form.elements.source_quality.value = job.source_quality || '1080';
       form.elements.subtitle_style.value = job.subtitle_style || 'classic';
       if (form.elements.topic) form.elements.topic.value = job.topic || 'general';
@@ -1386,7 +1388,7 @@ if (form) {
     if (statusEl) statusEl.textContent = 'Mengirim video…';
     try {
       const health = await api('/api/health');
-      if (!health.capabilities?.includes('source_quality') || !health.capabilities?.includes('smooth_crop')) throw Error('Perbaikan crop dan sumber HD memerlukan restart server. Setelah pekerjaan aktif selesai, hentikan aplikasi dengan Ctrl+C lalu jalankan npm run dev kembali.');
+      if (!health.capabilities?.includes('wide_crop')) throw Error('Pilihan jarak crop memerlukan restart server. Setelah pekerjaan aktif selesai, hentikan aplikasi dengan Ctrl+C lalu jalankan npm run dev kembali.');
       if (form.elements.audience?.value === 'global_en' && !health.capabilities?.includes('global_en')) throw Error('Studio Global memerlukan server versi baru. Setelah video aktif selesai, restart server lalu coba lagi.');
       const result = await api('/api/jobs', {method:'POST', body:new FormData(form)});
       clearTimeout(timer); ++selectionVersion;

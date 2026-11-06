@@ -53,17 +53,18 @@ def probe_media(path):
         return None
 
 
-def output_quality(source_media, width, height):
+def output_quality(source_media, width, height, *, foreground_height=None):
     if not source_media:
         return {'source_known':False, 'warning':'Resolusi sumber belum dapat dibaca.'}
     sw, sh = source_media['width'], source_media['height']
-    scale = max(width/sw, height/sh)
+    main_height = foreground_height or height
+    scale = max(width/sw, main_height/sh)
     warning = ''
     if scale > 1.05:
-        warning = f'Sumber {sw} × {sh} diperbesar {scale:.2f}× untuk area gambar {width} × {height}. Detail mengikuti sumber, bukan label resolusi output.'
+        warning = f'Sumber {sw} × {sh} diperbesar {scale:.2f}× untuk area gambar {width} × {main_height}. Detail mengikuti sumber, bukan label resolusi output.'
     return {'source_known':True, 'source_width':sw, 'source_height':sh,
             'output_width':width, 'output_height':height, 'upscale_factor':round(scale, 3),
-            'effective_crop_width':round(width/scale), 'effective_crop_height':round(height/scale),
+            'effective_crop_width':round(width/scale), 'effective_crop_height':round(main_height/scale),
             'warning':warning}
 
 

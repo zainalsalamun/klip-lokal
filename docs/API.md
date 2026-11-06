@@ -406,3 +406,6 @@ POST `/api/jobs` menerima form `source_quality=1080|1440|2160` (default1080); ni
 Job baru menyimpan `source_media={width,height,fps,codec,bitrate}` bila dapat dibaca. Setiap klip mempunyai `quality={source_known,source_width,source_height,output_width,output_height,upscale_factor,effective_crop_width,effective_crop_height,warning}` dan framing/encoder metadata. Data lama boleh tidak mempunyai field ini. Warning bukan estimasi ketajaman berbasis AI.
 
 Health capabilities `source_quality` dan `smooth_crop` menandai backend baru. Frontend menolak memulai job terhadap backend lama dan meminta restart setelah pekerjaan aktif selesai, agar source HD/crop halus tidak tampak aktif padahal worker masih versi lama.
+
+
+`POST /api/jobs` menerima `framing_layout=wide|full`. API default `full` untuk klien lama; form menawarkan `wide` sebagai pilihan awal. Nilai invalid ditolak 400. Metadata job/klip menyimpan layout, dan health capability `wide_crop` menunjukkan dukungan backend.

@@ -48,19 +48,62 @@ class ResolutionTests(unittest.TestCase):
                 self.assertGreater(first[0],first[2]+100)
                 self.assertGreater(last[2],last[0]+100)
 
+    def test_wide_crop_shows_more_scene_and_keeps_vertical_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.mp4"
+            module.run(["-f", "lavfi", "-i", "color=c=red:s=640x360:r=10",
+                        "-vf", "drawbox=x=215:y=0:w=210:h=360:color=blue:t=fill",
+                        "-t", "0.5", "-c:v", "libx264", source])
+            ass = root / "captions.ass"
+            module.write_subs(ass, [], 0, .5)
+            colors = {}
+            for layout in ("full", "wide"):
+                out = root / f"{layout}.mp4"
+                info = module.render_clip(source, ass, out, 0, .5, "480", framing_layout=layout)
+                with av.open(str(out)) as container:
+                    frame = next(container.decode(video=0)).to_ndarray(format="rgb24")
+                self.assertEqual(frame.shape[:2], (854, 480))
+                colors[layout] = frame[427, 12]
+            self.assertGreater(colors["full"][2], 150)
+            self.assertGreater(colors["wide"][0], 150)
+            self.assertEqual(info["foreground_height"], 684)
+
+    def test_wide_crop_tracks_foreground_without_moving_blurred_background(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.mp4"
+            module.run(["-f", "lavfi", "-i", "color=c=red:s=640x360:r=10",
+                        "-vf", "drawbox=x=320:y=0:w=320:h=360:color=blue:t=fill",
+                        "-t", "1", "-c:v", "libx264", source])
+            (root/"audio.wav").write_bytes(b"mock plan")
+            ass = root/"captions.ass"; out = root/"out.mp4"
+            module.write_subs(ass, [], 0, 1)
+            with patch("speaker_crop.crop_plan", return_value=([(0, 0), (.5, 736)], 4)) as plan:
+                module.render_clip(source, ass, out, 0, 1, "480", framing_layout="wide")
+            self.assertEqual(plan.call_args.args[-1], 684)
+            with av.open(str(out)) as container:
+                frames = [f.to_ndarray(format="rgb24") for f in container.decode(video=0)]
+            self.assertGreater(frames[0][427, 240, 0], 150)
+            self.assertGreater(frames[-1][427, 240, 2], 150)
+            self.assertLess(abs(int(frames[0][20, 100, 0])-int(frames[-1][20, 100, 0])), 10)
+
     def test_setting_persists_and_invalid_setting_rejected(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(module, "DATA", Path(directory)), patch.object(module, "jobs", {}), patch.object(module.threading, "Thread") as thread:
             client = module.app.test_client()
             self.assertEqual(client.post("/api/jobs", data={"url":"https://youtu.be/test", "resolution":"4k"}).status_code, 400)
+            self.assertEqual(client.post("/api/jobs", data={"url":"https://youtu.be/test", "framing_layout":"invalid"}).status_code, 400)
             for resolution in module.RESOLUTIONS:
-                response = client.post("/api/jobs", data={"video":(io.BytesIO(b"fixture"), "test.mp4"), "resolution":resolution})
+                response = client.post("/api/jobs", data={"video":(io.BytesIO(b"fixture"), "test.mp4"), "resolution":resolution, "framing_layout":"wide"})
                 self.assertEqual(response.status_code, 202)
                 jid = response.json["id"]
                 self.assertEqual(thread.call_args.kwargs["args"][6], resolution)
+                self.assertEqual(thread.call_args.kwargs["kwargs"]["framing_layout"], "wide")
                 module.update(jid, done=True)
                 module.jobs.clear()
                 self.assertEqual(client.get(f"/api/jobs/{jid}").json["resolution"], resolution)
                 self.assertEqual(client.get("/api/jobs").json["jobs"][0]["resolution"], resolution)
+                self.assertEqual(client.get("/api/jobs").json["jobs"][0]["framing_layout"], "wide")
 
 
 if __name__ == "__main__":
