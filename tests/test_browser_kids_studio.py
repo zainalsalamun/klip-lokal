@@ -174,6 +174,49 @@ class RealBrowserKidsStudioTests(unittest.TestCase):
         location.hash = '';
         await new Promise(resolve => setTimeout(resolve, 50));
         assert(document.querySelector('#results').hidden, 'Hasil riwayat tidak tampil di Studio Anak');
+
+        location.hash = '#history';
+        await new Promise(resolve => setTimeout(resolve, 50));
+        job.title = 'Judul terbaru';
+        await openJob(job.id);
+        assert(document.querySelector('#result-title').textContent === job.title, 'Klik ulang memuat versi terbaru');
+
+        const caption = results.querySelector('textarea');
+        caption.value = 'Draft belum disimpan';
+        caption.dispatchEvent(new Event('input'));
+        await openJob(job.id);
+        assert(results.querySelector('textarea').value === caption.value, 'Klik ulang mempertahankan draft');
+        window.confirm = () => false;
+        await openJob('another-job');
+        assert(selectedJobId === job.id && caption.isConnected, 'Batal pindah video mempertahankan draft');
+
+        window.confirm = () => true;
+        let resolveSlow;
+        window.api = async path => {
+          if (path.endsWith('/slow')) return new Promise(resolve => { resolveSlow = resolve; });
+          if (path.endsWith('/missing')) throw new Error('Video tidak ditemukan');
+          if (path.endsWith('/fast')) return {...job, id:'fast', title:'Pilihan terakhir'};
+          return {presets:[]};
+        };
+        const slow = openJob('slow');
+        await openJob('fast');
+        resolveSlow({...job, id:'slow', title:'Respons lama'});
+        await slow;
+        assert(document.querySelector('#result-title').textContent === 'Pilihan terakhir', 'Respons terlambat diabaikan');
+
+        await openJob('missing');
+        assert(results.hidden && historyResultStatus.textContent.includes('Video tidak ditemukan'), 'Gagal muat tampil di Riwayat dan hasil lama tersembunyi');
+        await openJob('fast');
+        assert(!results.hidden && !historyResultStatus.textContent, 'Riwayat pulih setelah pilihan berikutnya');
+
+        let resolveOldPoll;
+        window.api = () => new Promise(resolve => { resolveOldPoll = resolve; });
+        activeJobId = 'old-active';
+        const oldPoll = poll(activeJobId);
+        activeJobId = 'new-active';
+        resolveOldPoll({done:true});
+        await oldPoll;
+        assert(activeJobId === 'new-active', 'Status lama tidak membatalkan pekerjaan baru');
         """
         self._run_chrome_test(script, window_size="375,667")
 

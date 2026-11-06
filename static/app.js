@@ -1364,7 +1364,7 @@ async function openJob(id) {
       (fromHistory ? results.querySelector('.has-unsaved') : hasUnsavedCaptionEdits())) {
     if (!window.confirm('Ada perubahan caption yang belum disimpan ke server. Tetap pindah video tanpa menyimpan?')) return;
   }
-  if (fromHistory && selectedJobId === id && clipsGrid.children.length) {
+  if (fromHistory && selectedJobId === id && results.querySelector('.has-unsaved')) {
     resultsInHistory = true;
     syncResultsVisibility();
     results.scrollIntoView({block: 'start'});
@@ -1415,9 +1415,11 @@ async function openJob(id) {
   }
 }
 async function poll(id) {
+  if (activeJobId !== id) return;
   let job;
   try { job = await api('/api/jobs/' + encodeURIComponent(id)); }
   catch (error) {
+    if (activeJobId !== id) return;
     if (selectedJobId === id) {
       const message = error instanceof ConnectionError ? connectionMessage : 'Status belum dapat dimuat: ' + error.message;
       if (resultsInHistory) historyResultStatus.textContent = message;
@@ -1425,13 +1427,16 @@ async function poll(id) {
     }
     timer = setTimeout(() => poll(id), 4000); return;
   }
+  if (activeJobId !== id) return;
   if (job.done) {
     activeJobId = null; if (button) button.disabled = false;
     try { localStorage.removeItem('klip-job'); } catch (_) {}
   }
   try { if (selectedJobId === id) display(job); }
   catch (error) {
-    showError('Hasil belum dapat ditampilkan di antarmuka. Muat ulang halaman. (' + error.message + ')');
+    const message = 'Hasil belum dapat ditampilkan di antarmuka. Muat ulang halaman. (' + error.message + ')';
+    if (resultsInHistory) historyResultStatus.textContent = message;
+    else showError(message);
   }
   if (job.done) { refreshHistory().catch(historyError); return; }
   timer = setTimeout(() => poll(id), 1800);
@@ -2099,11 +2104,12 @@ async function init() {
     activeJobId = historyState.activeId || active?.id || null;
     if (button) button.disabled = Boolean(activeJobId);
     let saved; try { saved = localStorage.getItem('klip-selected') || localStorage.getItem('klip-job'); } catch (_) {}
+    const initialActiveId = activeJobId;
     const selectedId = saved || activeJobId || jobs[0]?.id;
     if (selectedId && !isGlobalStudio && location.hash !== '#history' && !(document.body.classList.contains('kids-studio') || document.body.classList.contains('kids-source'))) {
       await openJob(selectedId);
     }
-    if (activeJobId) poll(activeJobId);
+    if (initialActiveId && activeJobId === initialActiveId) poll(initialActiveId);
   } catch (error) {
     if (historyMessage) historyMessage.textContent = error instanceof ConnectionError ? connectionMessage : 'Riwayat tidak dapat dimuat: ' + error.message;
   }
