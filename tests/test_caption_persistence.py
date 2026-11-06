@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-import app
+from kelip import app
 
 
 class CaptionPersistenceTests(unittest.TestCase):

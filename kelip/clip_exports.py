@@ -3,8 +3,8 @@ from pathlib import Path
 import subprocess
 import cv2
 import numpy as np
-import watermark
-from media_quality import ENCODER_PRESET, ENCODER_CRF
+from . import watermark
+from .media_quality import ENCODER_PRESET, ENCODER_CRF
 
 
 def render_export(ffmpeg, source, destination, config, assets_dir, *, kind, frame_time=0, ratio='vertical'):

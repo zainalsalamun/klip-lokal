@@ -11,7 +11,7 @@ import hashlib
 import subprocess
 import cv2
 
-m = importlib.import_module('app')
+m = importlib.import_module('kelip.app')
 
 
 class KidsPipelineExportTests(unittest.TestCase):

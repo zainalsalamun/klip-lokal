@@ -2,7 +2,7 @@
 
 ## Siklus server lokal
 
-`Mulai.command` menyiapkan dependensi lalu memanggil `serverctl.py start`. Controller memakai `launchctl submit` dengan label `local.klip.server`, path interpreter/source absolut, dan output ke `data/server.log`. Job terpisah dari proses Terminal/chat; tidak ada instalasi login item. Controller menunggu `/api/health` sebelum browser dibuka. `Berhenti.command` memanggil controller stop, yang menolak bila health check melaporkan pekerjaan aktif. Ini bukan mekanisme graceful shutdown transaksional: jangan memulai pekerjaan baru ketika sedang menghentikan server. Setelah logout/reboot, mulai kembali secara manual.
+`Mulai.command` menyiapkan dependensi lalu memanggil `python -m kelip.serverctl start`. Controller memakai `launchctl submit` dengan label `local.klip.server`, direktori proyek dan path interpreter absolut, dan output ke `data/server.log`. Job terpisah dari proses Terminal/chat; tidak ada instalasi login item. Controller menunggu `/api/health` sebelum browser dibuka. `Berhenti.command` memanggil controller stop, yang menolak bila health check melaporkan pekerjaan aktif. Ini bukan mekanisme graceful shutdown transaksional: jangan memulai pekerjaan baru ketika sedang menghentikan server. Setelah logout/reboot, mulai kembali secara manual.
 
 ## Komponen
 
@@ -31,7 +31,7 @@ Browser → GET /files/<id>/clip-N.mp4
 3. Ekstrak audio mono WAV 16 kHz dengan FFmpeg yang dipaketkan imageio-ffmpeg.
 4. Muat Whisper `base` sekali per proses server. Jalankan CPU `int8`, `vad_filter=True`, `beam_size=3`; simpan transkrip segmen.
 5. Pilih jendela kandidat, beri skor, lalu ambil kandidat skor tertinggi yang tidak saling beririsan.
-6. Tulis ASS dan render setiap klip secara berurutan. Skala hingga menutup resolusi terpilih (480×854, 720×1280, atau 1080×1920) lalu crop yang mengikuti perkiraan pembicara (`speaker_crop.py`: Haar face detector OpenCV, gerakan area mulut dikurangi gerakan atas wajah, gerbang RMS audio, hysteresis dan smoothing). Analisis wajah sekitar4Hz dipisahkan dari trajectory kamera. Target diinterpolasi dan dihaluskan dengan batas kecepatan/akselerasi serta dead-zone berbasis waktu; sendcmd dibuat per-frame dari PTS decode. Perubahan scene besar pada sampel dapat mereset trajectory sebagai heuristik. Jika deteksi tidak menghasilkan wajah atau analisis gagal, fallback crop tengah dengan catatan framing. Selanjutnya `setsar=1`, bakar subtitle, enkode H.264 (`fast`, CRF18, scaling Lanczos) dan AAC. `+faststart` membantu pemutaran MP4.
+6. Tulis ASS dan render setiap klip secara berurutan. Skala hingga menutup resolusi terpilih (480×854, 720×1280, atau 1080×1920) lalu crop yang mengikuti perkiraan pembicara (`kelip/speaker_crop.py`: Haar face detector OpenCV, gerakan area mulut dikurangi gerakan atas wajah, gerbang RMS audio, hysteresis dan smoothing). Analisis wajah sekitar4Hz dipisahkan dari trajectory kamera. Target diinterpolasi dan dihaluskan dengan batas kecepatan/akselerasi serta dead-zone berbasis waktu; sendcmd dibuat per-frame dari PTS decode. Perubahan scene besar pada sampel dapat mereset trajectory sebagai heuristik. Jika deteksi tidak menghasilkan wajah atau analisis gagal, fallback crop tengah dengan catatan framing. Selanjutnya `setsar=1`, bakar subtitle, enkode H.264 (`fast`, CRF18, scaling Lanczos) dan AAC. `+faststart` membantu pemutaran MP4.
 7. Tulis status akhir beserta daftar hasil.
 
 ## Skor kandidat
@@ -64,17 +64,17 @@ Penyimpanan masih memakai direktori JSON: setiap pencarian tetap memindai nama/s
 
 ## Mode Global
 
-`/global` memakai template yang sama dengan parameter Jinja `global_mode`. Topik dan sumber ide berasal dari `global_content.py`. Worker menerima audience/topic, memilih task Whisper translate untuk Global atau transcribe untuk lokal, lalu memakai pipeline ekspor yang sama dengan audio sumber. Topic menambah bobot keyword; tidak memanggil model rekomendasi terpisah. Caption awal dan fallback history mengikuti audience.
+`/global` memakai template yang sama dengan parameter Jinja `global_mode`. Topik dan sumber ide berasal dari `kelip/global_content.py`. Worker menerima audience/topic, memilih task Whisper translate untuk Global atau transcribe untuk lokal, lalu memakai pipeline ekspor yang sama dengan audio sumber. Topic menambah bobot keyword; tidak memanggil model rekomendasi terpisah. Caption awal dan fallback history mengikuti audience.
 
 
-Preset tampilan subtitle didefinisikan di `subtitle_styles.py`. UI merender daftar dari konfigurasi backend; server memvalidasi whitelist, menyimpan `subtitle_style`, dan meneruskannya ke `write_subs()`. Preset mengganti ASS style (warna, bobot, ukuran, outline/latar) tanpa mengubah segmentasi atau timestamp. Semua memakai kanvas 720×1280 sehingga skala tetap konsisten di setiap resolusi. Preview CSS adalah ilustrasi preset, bukan render ASS.
+Preset tampilan subtitle didefinisikan di `kelip/subtitle_styles.py`. UI merender daftar dari konfigurasi backend; server memvalidasi whitelist, menyimpan `subtitle_style`, dan meneruskannya ke `write_subs()`. Preset mengganti ASS style (warna, bobot, ukuran, outline/latar) tanpa mengubah segmentasi atau timestamp. Semua memakai kanvas 720×1280 sehingga skala tetap konsisten di setiap resolusi. Preview CSS adalah ilustrasi preset, bukan render ASS.
 
 
 Setelah ekspor MP4, worker menjalankan `local_caption.summarize()` berurutan pada transkrip tiap klip. Runtime memakai Ollama loopback dengan model Qwen3 1.7B. Output JSON harus memuat caption singkat dan kutipan pendukung yang ada dalam transkrip. Kegagalan AI tidak menggagalkan video. Endpoint regenerasi caption memperbarui metadata secara atomik tanpa menulis video; permintaan tidak memegang lock pekerjaan selama inferensi. Tidak ada cloud fallback.
 
 ## Modul Watermark
 
-Modul `watermark.py` mengelola konfigurasi, aset, preset, geometri penempatan, deteksi benturan, dan komposisi overlay visual pada klip:
+Modul `kelip/watermark.py` mengelola konfigurasi, aset, preset, geometri penempatan, deteksi benturan, dan komposisi overlay visual pada klip:
 1. **Validasi & Penyimpanan Aset**: Unggahan logo dibatasi 5 MiB, format PNG/JPG, dimensi 10×10 hingga 4096×4096 piksel, penolakan animasi (APNG) dan rasio dekompresi bomb (maksimal 200:1 dan 16,7M total piksel). File dinormalisasi dan disimpan di `data/watermark-assets/<asset_id>.<ext>`.
 2. **Preset Reusable**: Daftar preset watermark disimpan di `data/watermark-presets.json` dengan penulisan file sementara atomik.
 3. **Geometri & Deteksi Benturan**: Kotak batas watermark dihitung dari 9 jangkar posisi, persentase lebar kanvas, dan persentase margin dari dimensi terpendek kanvas (mendukung margin 0% rapat tepi). Deteksi benturan subtitle memeriksa irisan geometris antara bounding box watermark dan area subtitle ASS (zona bawah vertikal y=72%–100%), sehingga logo tinggi di tengah maupun watermark di area bawah terdeteksi secara akurat.

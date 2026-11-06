@@ -9,8 +9,8 @@ from unittest.mock import patch
 import cv2
 import numpy as np
 
-import app
-import watermark
+from kelip import app
+from kelip import watermark
 
 
 class WatermarkTests(unittest.TestCase):

@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-import app as module
+from kelip import app as module
 
 
 class CaptionTests(unittest.TestCase):

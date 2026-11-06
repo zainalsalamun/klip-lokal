@@ -11,7 +11,7 @@ import unittest
 
 import jinja2
 
-import kids_content
+from kelip import kids_content
 
 CHROME_PATH = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 

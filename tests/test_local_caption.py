@@ -3,8 +3,8 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-import app
-import local_caption as ai
+from kelip import app
+from kelip import local_caption as ai
 
 
 class LocalCaptionTests(unittest.TestCase):

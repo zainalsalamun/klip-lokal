@@ -3,7 +3,7 @@ from pathlib import Path
 import json, os, socket, subprocess, sys, time
 from urllib.request import urlopen
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 LABEL = "local.klip.server"
 URL = "http://127.0.0.1:8765"
 LOG = ROOT / "data" / "server.log"
@@ -40,7 +40,7 @@ def main():
         print("Tidak ada server yang dikelola launcher. Hentikan server manual dengan Control-C di Terminal asalnya.")
         return 0 if not state else 1
     if action != "start":
-        print("Usage: python serverctl.py start|stop|status")
+        print("Usage: python -m kelip.serverctl start|stop|status")
         return 2
     if health():
         print("Server siap: " + URL)
@@ -52,7 +52,11 @@ def main():
     if registered():
         subprocess.run(["launchctl", "remove", LABEL], check=True)
     LOG.parent.mkdir(exist_ok=True)
-    subprocess.run(["launchctl", "submit", "-l", LABEL, "-o", str(LOG), "-e", str(LOG), "--", str(ROOT / ".venv/bin/python"), str(ROOT / "app.py")], check=True)
+    subprocess.run([
+        "launchctl", "submit", "-l", LABEL, "-o", str(LOG), "-e", str(LOG), "--",
+        "/bin/sh", "-c", 'cd "$1" && exec "$2" -m kelip.app', "kelip-launcher",
+        str(ROOT), str(ROOT / ".venv/bin/python"),
+    ], check=True)
     for _ in range(100):
         if health():
             print("Server siap: " + URL)

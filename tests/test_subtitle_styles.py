@@ -6,8 +6,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import av
-import app as module
-from subtitle_styles import SUBTITLE_STYLES
+from kelip import app as module
+from kelip.subtitle_styles import SUBTITLE_STYLES
 
 
 class SubtitleStyleTests(unittest.TestCase):

@@ -6,15 +6,15 @@ os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 from urllib.parse import urlparse
 from flask import Flask, request, jsonify, send_from_directory, render_template, redirect, Response
 import imageio_ffmpeg
-from global_content import TOPICS, IDEAS, SOURCES
-from subtitle_styles import SUBTITLE_STYLES
-from local_caption import summarize, CaptionUnavailable, UnclearTranscript, inference_lock
-import watermark
-import kids_content
-import clip_exports
-from media_quality import download_options, downloaded_path, probe_media, output_quality, SOURCE_HEIGHTS, ENCODER_PRESET, ENCODER_CRF, SCALE_FLAGS
+from .global_content import TOPICS, IDEAS, SOURCES
+from .subtitle_styles import SUBTITLE_STYLES
+from .local_caption import summarize, CaptionUnavailable, UnclearTranscript, inference_lock
+from . import watermark
+from . import kids_content
+from . import clip_exports
+from .media_quality import download_options, downloaded_path, probe_media, output_quality, SOURCE_HEIGHTS, ENCODER_PRESET, ENCODER_CRF, SCALE_FLAGS
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
 WATERMARK_ASSETS = DATA / "watermark-assets"
@@ -23,7 +23,7 @@ WATERMARK_PRESETS = DATA / "watermark-presets.json"
 KIDS_BRIEFS = DATA / "kids-briefs"
 KIDS_BRIEFS.mkdir(exist_ok=True)
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
-app = Flask(__name__)
+app = Flask(__name__, template_folder=str(ROOT / "templates"), static_folder=str(ROOT / "static"))
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024**3
 jobs = {}
 history_cache = OrderedDict()
@@ -245,7 +245,7 @@ def render_clip(source, ass, out, start, end, resolution="720", framing_layout="
     audio = ass.parent / "audio.wav"
     if audio.exists():
         try:
-            from speaker_crop import crop_plan
+            from .speaker_crop import crop_plan
             points, detected = crop_plan(source, audio, start, end, width, main_height)
             if points:
                 commands = ass.with_suffix('.crop.txt')

@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import app as m
+from kelip import app as m
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--data', type=Path, required=True)

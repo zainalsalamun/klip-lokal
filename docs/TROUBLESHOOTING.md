@@ -2,7 +2,7 @@
 
 ## Halaman tidak terbuka
 
-Jalankan `Mulai.command` dan lihat log Terminal. Pastikan launcher menampilkan `Server siap: http://127.0.0.1:8765`. Periksa `.venv/bin/python serverctl.py status` dan `data/server.log`. `ERR_CONNECTION_REFUSED` berarti tidak ada server yang dapat dihubungi pada port tersebut; jalankan launcher lalu muat ulang. Alamat hanya berfungsi pada laptop yang menjalankan server. Jika membuka aplikasi dari perangkat lain, localhost menunjuk perangkat itu sendiri.
+Jalankan `Mulai.command` dan lihat log Terminal. Pastikan launcher menampilkan `Server siap: http://127.0.0.1:8765`. Periksa `.venv/bin/python -m kelip.serverctl status` dan `data/server.log`. `ERR_CONNECTION_REFUSED` berarti tidak ada server yang dapat dihubungi pada port tersebut; jalankan launcher lalu muat ulang. Alamat hanya berfungsi pada laptop yang menjalankan server. Jika membuka aplikasi dari perangkat lain, localhost menunjuk perangkat itu sendiri.
 
 ## Port 8765 sudah dipakai
 
@@ -12,7 +12,7 @@ Jangan menjalankan launcher berulang kali. Untuk server launcher, jalankan `Berh
 lsof -nP -iTCP:8765 -sTCP:LISTEN
 ```
 
-Periksa identitas proses sebelum menghentikannya. Alternatif, ubah port di `app.py`, alamat launcher, dan dokumentasi.
+Periksa identitas proses sebelum menghentikannya. Alternatif, ubah port di `kelip/app.py`, alamat launcher, dan dokumentasi.
 
 ## Python/npm tidak ditemukan atau izin launcher
 

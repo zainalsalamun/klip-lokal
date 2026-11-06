@@ -13,18 +13,18 @@ Berlaku untuk seluruh repository Klip lokal. Baca file ini sebelum mengubah kode
 
 | Berkas | Tanggung jawab |
 | --- | --- |
-| `app.py` | Flask, validasi API, worker video, metadata/history, ASS, ekspor |
-| `media_quality.py` | Pemilihan sumber YouTube, probe sumber, kualitas dan encoder bersama |
-| `kids_content.py`, `clip_exports.py` | Brief Studio Anak dan ekspor turunan klip MP4/PNG |
-| `global_content.py` | Topik dan ide editorial Studio Global |
-| `speaker_crop.py` | Perkiraan pembicara dari wajah/gerakan mulut dan audio |
-| `subtitle_styles.py` | Whitelist preset ASS |
-| `local_caption.py` | Caption semantik lewat Ollama loopback |
+| `kelip/app.py` | Flask, validasi API, worker video, metadata/history, ASS, ekspor |
+| `kelip/media_quality.py` | Pemilihan sumber YouTube, probe sumber, kualitas dan encoder bersama |
+| `kelip/kids_content.py`, `kelip/clip_exports.py` | Brief Studio Anak dan ekspor turunan klip MP4/PNG |
+| `kelip/global_content.py` | Topik dan ide editorial Studio Global |
+| `kelip/speaker_crop.py` | Perkiraan pembicara dari wajah/gerakan mulut dan audio |
+| `kelip/subtitle_styles.py` | Whitelist preset ASS |
+| `kelip/local_caption.py` | Caption semantik lewat Ollama loopback |
 | `templates/index.html` | Template kedua studio dan halaman history |
 | `static/app.js` | Form, polling, history, caption, navigasi |
 | `static/custom-select.js` | Combobox yang menyinkronkan select asli |
 | `static/style.css` | Tampilan dan breakpoint |
-| `serverctl.py`, `dev.sh`, `*.command` | Siklus hidup server lokal |
+| `kelip/serverctl.py`, `dev.sh`, `*.command` | Siklus hidup server lokal |
 
 ## Batas yang harus dipertahankan
 

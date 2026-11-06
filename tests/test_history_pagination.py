@@ -5,7 +5,7 @@ import unittest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 from collections import OrderedDict
-import app as module
+from kelip import app as module
 
 
 class PaginationTests(unittest.TestCase):

@@ -6,8 +6,8 @@ import shutil
 import tempfile
 import unittest
 
-from app import app
-import kids_content
+from kelip.app import app
+from kelip import kids_content
 
 
 class KidsContentUnitTest(unittest.TestCase):
@@ -186,13 +186,13 @@ class KidsStudioApiTest(unittest.TestCase):
         self.test_dir = Path(tempfile.mkdtemp(prefix="test_app_briefs_"))
         self.orig_briefs = app.view_functions.get("get_kids_briefs")
         # Arahkan KIDS_BRIEFS ke direktori uji sementara
-        import app as app_module
+        from kelip import app as app_module
         self.orig_kids_briefs_dir = app_module.KIDS_BRIEFS
         app_module.KIDS_BRIEFS = self.test_dir
         self.client = app.test_client()
 
     def tearDown(self):
-        import app as app_module
+        from kelip import app as app_module
         app_module.KIDS_BRIEFS = self.orig_kids_briefs_dir
         shutil.rmtree(self.test_dir, ignore_errors=True)
 

@@ -10,9 +10,9 @@ import av
 import cv2
 import numpy as np
 from yt_dlp import YoutubeDL
-import app
-from media_quality import download_options, downloaded_path, output_quality
-from speaker_crop import smooth_crop_points, crop_plan
+from kelip import app
+from kelip.media_quality import download_options, downloaded_path, output_quality
+from kelip.speaker_crop import smooth_crop_points, crop_plan
 
 
 class MediaQualityTests(unittest.TestCase):
@@ -121,7 +121,7 @@ class MediaQualityTests(unittest.TestCase):
             (root/'audio.wav').write_bytes(b'plan mocked, audio not read')
             app.write_subs(ass,[],0,2)
             points=smooth_crop_points([(0,0),(.267,0),(.533,600),(1.9,900)],[i/30 for i in range(60)],1040,480)
-            with patch('speaker_crop.crop_plan',return_value=(points,8)):
+            with patch('kelip.speaker_crop.crop_plan',return_value=(points,8)):
                 framing=app.render_clip(source,ass,out,0,2,'480')
             self.assertEqual(framing['camera_motion'],'per_frame_damped')
             self.assertEqual(framing['encoder']['crf'],18)

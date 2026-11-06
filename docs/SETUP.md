@@ -33,17 +33,17 @@ chmod +x Mulai.command
 ./Mulai.command
 ```
 
-Launcher memanggil `setup_local.py`: memilih Python 3.11–3.13, membuat `.venv` jika belum ada, menyelaraskan requirements bila hash berubah/impor gagal, dan memasang runtime Node proyek bila belum ada. Kemudian `serverctl.py start` menjalankan Flask melalui job launchd sesi pengguna (`local.klip.server`), menunggu health check berhasil, baru browser dibuka ke http://127.0.0.1:8765. Terminal boleh ditutup setelah server siap. Tidak ada login item yang dipasang: setelah restart/logout, jalankan launcher lagi. Log tersimpan di `data/server.log`.
+Launcher memanggil `kelip/setup_local.py`: memilih Python 3.11–3.13, membuat `.venv` jika belum ada, menyelaraskan requirements bila hash berubah/impor gagal, dan memasang runtime Node proyek bila belum ada. Kemudian `python -m kelip.serverctl start` menjalankan Flask melalui job launchd sesi pengguna (`local.klip.server`), menunggu health check berhasil, baru browser dibuka ke http://127.0.0.1:8765. Terminal boleh ditutup setelah server siap. Tidak ada login item yang dipasang: setelah restart/logout, jalankan launcher lagi. Log tersimpan di `data/server.log`.
 
 Klik dua kali `Berhenti.command` untuk menghentikan server. Controller menolak penghentian bila ada pekerjaan aktif. Alternatif Terminal:
 
 ```sh
-.venv/bin/python serverctl.py start
-.venv/bin/python serverctl.py status
-.venv/bin/python serverctl.py stop
+.venv/bin/python -m kelip.serverctl start
+.venv/bin/python -m kelip.serverctl status
+.venv/bin/python -m kelip.serverctl stop
 ```
 
-Menjalankan launcher lagi saat server sehat akan memakai server yang sama. Bila server crash, jalankan launcher kembali. Server manual `.venv/bin/python app.py` tetap memerlukan Terminal terbuka dan dihentikan dengan Control-C.
+Menjalankan launcher lagi saat server sehat akan memakai server yang sama. Bila server crash, jalankan launcher kembali. Server manual `.venv/bin/python -m kelip.app` tetap memerlukan Terminal terbuka dan dihentikan dengan Control-C.
 
 Setup mencatat hash requirements di `.venv/.klip-requirements.sha256` setelah instalasi berhasil. Requirements berubah memicu pemasangan ulang; environment yang tidak kompatibel tidak dihapus otomatis.
 
@@ -59,13 +59,13 @@ Mode ini tidak membuka browser otomatis dan tidak memakai auto-reload. Buka alam
 
 ## Instalasi manual / perangkat baru
 
-Clone seluruh source repository, termasuk modul Python, `setup_local.py`, template, aset dan metadata runtime Node. Jangan menyalin `.venv`, `runtime/node_modules`, atau cache npm antarperangkat. Data/model boleh dipindahkan terpisah jika memang ingin mempertahankannya.
+Clone seluruh source repository, termasuk modul Python, `kelip/setup_local.py`, template, aset dan metadata runtime Node. Jangan menyalin `.venv`, `runtime/node_modules`, atau cache npm antarperangkat. Data/model boleh dipindahkan terpisah jika memang ingin mempertahankannya.
 
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 npm --cache "$PWD/.npm-cache" --prefix runtime ci --no-audit --no-fund
-.venv/bin/python app.py
+.venv/bin/python -m kelip.app
 ```
 
 Buka http://127.0.0.1:8765. Jika tidak memiliki lockfile npm, gunakan `npm install` sebagai pengganti `npm ci`. Untuk pemakaian offline dengan unggahan video, dependensi dan model harus sudah tersedia; font antarmuka akan beralih ke font sistem bila Google Fonts tidak dapat diakses.
@@ -85,7 +85,7 @@ Pembaruan yt-dlp kadang diperlukan ketika YouTube berubah. Ubah versi dalam requ
 
 ## Konfigurasi
 
-Versi ini belum memiliki file `.env` atau pengaturan konfigurasi melalui UI. Host/port, model, codec dan resolusi ditetapkan di `app.py`; lokasi perubahan ada di [panduan pengembangan](DEVELOPMENT.md). `HF_HUB_DISABLE_XET=1` dipasang sebagai default lingkungan oleh aplikasi untuk menghindari masalah unduhan model melalui Xet yang terlihat saat setup. Cache model ada di `data/models/`.
+Versi ini belum memiliki file `.env` atau pengaturan konfigurasi melalui UI. Host/port, model, codec dan resolusi ditetapkan di `kelip/app.py`; lokasi perubahan ada di [panduan pengembangan](DEVELOPMENT.md). `HF_HUB_DISABLE_XET=1` dipasang sebagai default lingkungan oleh aplikasi untuk menghindari masalah unduhan model melalui Xet yang terlihat saat setup. Cache model ada di `data/models/`.
 
 Pelacakan pembicara memerlukan `opencv-python-headless` (tercantum di requirements). Instalasi lama: jalankan `.venv/bin/python -m pip install -r requirements.txt`, lalu restart server saat tidak ada video aktif. Launcher juga memeriksa import `cv2`. Model Haar sudah disertakan paket, tanpa unduhan model tambahan.
 

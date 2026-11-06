@@ -6,18 +6,24 @@ Baca [CONTRIBUTING](../CONTRIBUTING.md) dan [AGENTS](../AGENTS.md) sebelum mengu
 
 ```text
 klip-lokal/
-  app.py                    server, pipeline, scoring, subtitle dan route
-  local_caption.py          ringkasan caption melalui Ollama lokal
-  speaker_crop.py           perkiraan pembicara dan posisi crop
-  subtitle_styles.py        preset ASS dan label pilihan
-  global_content.py         topik dan ide editorial
+  kelip/                    paket backend dan utilitas lokal
+    app.py                  server Flask, pipeline, scoring dan route
+    clip_exports.py         ekspor watermark dan thumbnail
+    global_content.py       topik dan ide editorial
+    kids_content.py         pengelolaan brief Studio Anak
+    local_caption.py        ringkasan caption melalui Ollama lokal
+    media_quality.py        pemilihan sumber dan kualitas hasil
+    serverctl.py            start/stop/status melalui launchd
+    setup_local.py          bootstrap dan diagnosis dependensi
+    speaker_crop.py         perkiraan pembicara dan posisi crop
+    subtitle_styles.py      preset ASS dan label pilihan
+    watermark.py            konfigurasi, aset dan preset watermark
   AGENTS.md                 panduan coding agent
   CONTRIBUTING.md            alur kontribusi developer
   package.json              dev / start / setup:ai
   dev.sh                    bootstrap dan server foreground
   Mulai.command             launcher server latar belakang macOS
   Berhenti.command          penghentian server
-  serverctl.py              start/stop/status melalui launchd
   requirements.txt          pin dependensi Python
   templates/index.html      antarmuka Jinja
   static/app.js             form, polling dan kartu hasil
@@ -52,17 +58,17 @@ Debug/reloader sengaja nonaktif karena worker/model disimpan dalam proses. Resta
 | Model dan compute | `WhisperModel()` dalam `process()` |
 | Bahasa/durasi/jumlah yang diterima | Validasi `create()`; selaraskan opsi HTML |
 | Skor kandidat | `candidates()` |
-| Tampilan subtitle | `subtitle_styles.py` dan `write_subs()` |
-| Caption AI lokal | `local_caption.py`, endpoint regenerasi dan editor di JS |
+| Tampilan subtitle | `kelip/subtitle_styles.py` dan `write_subs()` |
+| Caption AI lokal | `kelip/local_caption.py`, endpoint regenerasi dan editor di JS |
 | Resolusi, crop, codec | `RESOLUTIONS` dan `render_clip()` |
 | Download format/runtime | Opsi `yt_dlp.YoutubeDL()` |
 
-Jika port berubah, sesuaikan alamat pada `Mulai.command`, URL serta probe socket di `serverctl.py`, dan dokumentasi. Kanvas ASS tetap 720×1280; renderer menskalakannya mengikuti ukuran hasil. Jika menambah preset resolusi, selaraskan `RESOLUTIONS`, opsi HTML, dan `outputSizes` di JavaScript. Belum ada konfigurasi melalui environment untuk parameter tersebut.
+Jika port berubah, sesuaikan alamat pada `Mulai.command`, URL serta probe socket di `kelip/serverctl.py`, dan dokumentasi. Kanvas ASS tetap 720×1280; renderer menskalakannya mengikuti ukuran hasil. Jika menambah preset resolusi, selaraskan `RESOLUTIONS`, opsi HTML, dan `outputSizes` di JavaScript. Belum ada konfigurasi melalui environment untuk parameter tersebut.
 
 ## Pemeriksaan cepat
 
 ```sh
-.venv/bin/python -m compileall -q app.py
+.venv/bin/python -m compileall -q kelip
 runtime/node_modules/node/bin/node --check static/app.js
 .venv/bin/python -m pip check
 ```
@@ -145,7 +151,7 @@ Tes menggunakan direktori sementara: seluruh artefak target terhapus, metadata t
 
 ## Pengembangan Studio Global
 
-Ide terkurasi berada di `global_content.py`. Tambahkan topik secara serentak pada `TOPICS`, kartu ide, opsi template dan dokumentasi. Tes `test_global_studio.py` mencakup route/ide, validasi input, penerusan konfigurasi, pemilihan task transcribe/translate, caption Inggris, penggunaan sumber audio yang sama dan bobot niche. Dokumentasi khusus tersedia di GLOBAL.md.
+Ide terkurasi berada di `kelip/global_content.py`. Tambahkan topik secara serentak pada `TOPICS`, kartu ide, opsi template dan dokumentasi. Tes `test_global_studio.py` mencakup route/ide, validasi input, penerusan konfigurasi, pemilihan task transcribe/translate, caption Inggris, penggunaan sumber audio yang sama dan bobot niche. Dokumentasi khusus tersedia di GLOBAL.md.
 
 ## Navigasi riwayat
 
@@ -159,16 +165,16 @@ Jalankan `runtime/node_modules/node/bin/node tests/test_api_errors.cjs` untuk me
 Tes `test_speech_cuts.py` memeriksa segmen ucapan utuh, akhir kalimat, batas durasi, non-overlap dan hysteresis crop. `test_resolution.py` juga memeriksa render crop dinamis nyata menggunakan sumber warna kiri/kanan dan membandingkan piksel frame awal/akhir, bukan hanya command. Heuristik deteksi pembicara tidak menjamin akurasi semua video; belum ada benchmark diarization.
 
 
-`tests/test_subtitle_styles.py` memeriksa validasi preset, penyimpanan/restart, penerusan opsi worker, fallback history lama, dan render MP4 semua gaya di 480p serta 720p. Frame ekspor dibandingkan agar setiap preset benar-benar berbeda; piksel kuning juga diverifikasi. Preset default mempertahankan ASS style sebelumnya. Untuk menambah gaya, daftarkan di `subtitle_styles.py` dan tambahkan aturan preview CSS dengan nama preset yang sama.
+`tests/test_subtitle_styles.py` memeriksa validasi preset, penyimpanan/restart, penerusan opsi worker, fallback history lama, dan render MP4 semua gaya di 480p serta 720p. Frame ekspor dibandingkan agar setiap preset benar-benar berbeda; piksel kuning juga diverifikasi. Preset default mempertahankan ASS style sebelumnya. Untuk menambah gaya, daftarkan di `kelip/subtitle_styles.py` dan tambahkan aturan preview CSS dengan nama preset yang sama.
 
 
-Caption semantik: `local_caption.py` memakai Ollama loopback dengan JSON schema, `think=false`/context 2048 pada percobaan awal dan `think=true`/context 3072 saat memperbaiki bahasa, batas output, kutipan pendukung verbatim dan penolakan transkrip tidak jelas. `tests/test_local_caption.py` menguji payload bahasa/privasi lokal, parsing/validasi, model tidak tersedia, persistensi endpoint, pelestarian video/caption pada kegagalan dan guard video aktif. Unit test memalsukan transport AI; uji model nyata dilakukan terpisah sesudah setup.
+Caption semantik: `kelip/local_caption.py` memakai Ollama loopback dengan JSON schema, `think=false`/context 2048 pada percobaan awal dan `think=true`/context 3072 saat memperbaiki bahasa, batas output, kutipan pendukung verbatim dan penolakan transkrip tidak jelas. `tests/test_local_caption.py` menguji payload bahasa/privasi lokal, parsing/validasi, model tidak tersedia, persistensi endpoint, pelestarian video/caption pada kegagalan dan guard video aktif. Unit test memalsukan transport AI; uji model nyata dilakukan terpisah sesudah setup.
 
 
 Pemeriksaan kualitas awal memakai pengulangan trigram/kata dominan agar transkrip ASR yang sangat repetitif ditolak sebelum inferensi. Uji nyata menemukan prompt saja tidak cukup menolak semua input kacau; validasi ini melengkapi prompt dan kutipan pendukung, bukan jaminan pemahaman semantik.
 
 
-Bootstrap terpusat ada di `setup_local.py`, dipakai `npm run setup`, `setup:ai`, dan kedua launcher. `npm run doctor` melakukan pemeriksaan baca-saja. Perubahan requirements harus mempertimbangkan marker hash dan `.venv` lama. Lihat [NEW_MACHINE](NEW_MACHINE.md) untuk dukungan platform dan pengujian checkout bersih.
+Bootstrap terpusat ada di `kelip/setup_local.py`, dipakai `npm run setup`, `setup:ai`, dan kedua launcher. `npm run doctor` melakukan pemeriksaan baca-saja. Perubahan requirements harus mempertimbangkan marker hash dan `.venv` lama. Lihat [NEW_MACHINE](NEW_MACHINE.md) untuk dukungan platform dan pengujian checkout bersih.
 
 
 Bahasa caption ditentukan oleh audience: lokal Indonesia, Global Inggris. `langdetect` dengan seed tetap memeriksa keluaran; salah bahasa memicu satu retry lalu penolakan. Prompt/few-shot dipisah per bahasa. Model memilih indeks kalimat untuk evidence agar kutipan sumber tidak diparafrasekan. Tes mencakup penolakan bahasa salah, batas retry, terjemahan caption dengan evidence bahasa sumber, dan validasi indeks.
@@ -176,7 +182,7 @@ Bahasa caption ditentukan oleh audience: lokal Indonesia, Global Inggris. `langd
 
 ## Modul Studio Anak (Milestone K1)
 
-1. **Modul Ide & Data**: `kids_content.py` mendefinisikan katalog 10 ide editorial orisinal (`IDEAS`), 10 kategori terkurasi (`CATEGORIES`), sumber acuan kebijakan platform (`SOURCES`), serta fungsi validasi payload, penulisan atomik, dan pembacaan brief.
+1. **Modul Ide & Data**: `kelip/kids_content.py` mendefinisikan katalog 10 ide editorial orisinal (`IDEAS`), 10 kategori terkurasi (`CATEGORIES`), sumber acuan kebijakan platform (`SOURCES`), serta fungsi validasi payload, penulisan atomik, dan pembacaan brief.
 2. **Penyimpanan Brief Terisolasi**: Brief disimpan di `data/kids-briefs/<brief_id>.json` secara terpisah dari folder pekerjaan video, sehingga scanner riwayat `job_summary()` mengabaikannya secara otomatis.
 3. **Pengendalian Konkurensi Optimistik (OCC)**: `PATCH /api/kids/briefs/<id>` mewajibkan parameter `expected_revision`. Ketidakcocokan versi memicu respons HTTP 409 dengan data versi server terkini, memungkinkan antarmuka menyelesaikan konflik tanpa kehilangan draft lokal.
 4. **Ekspor Offline**: Fungsi `format_brief_txt` di backend dan implementasi blob di frontend menyediakan ekspor teks dan JSON tanpa memerlukan koneksi jaringan, model AI, atau worker media.
@@ -187,4 +193,4 @@ Bahasa caption ditentukan oleh audience: lokal Indonesia, Global Inggris. `langd
 
 ## K2/K3 dan ekspor turunan
 
-Form `/kids/source` dan POST job memakai profil orthogonal audience serta snapshot brief. `clip_exports.py` mengekspor dari MP4 awal dengan watermark snapshot dan frame PNG. Endpoint ekspor async berada di app.py; reservation media dan status metadata di bawah RLock, idempotensi request ID wajib. UI clipOutputTools mem-poll status tanpa merender ulang editor yang mempunyai draft. Renderer trim/subtitle M2 dan editor judul/template thumbnail belum tersedia.
+Form `/kids/source` dan POST job memakai profil orthogonal audience serta snapshot brief. `kelip/clip_exports.py` mengekspor dari MP4 awal dengan watermark snapshot dan frame PNG. Endpoint ekspor async berada di app.py; reservation media dan status metadata di bawah RLock, idempotensi request ID wajib. UI clipOutputTools mem-poll status tanpa merender ulang editor yang mempunyai draft. Renderer trim/subtitle M2 dan editor judul/template thumbnail belum tersedia.

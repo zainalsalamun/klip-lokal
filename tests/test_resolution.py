@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import av
-import app as module
+from kelip import app as module
 
 
 class ResolutionTests(unittest.TestCase):
@@ -38,7 +38,7 @@ class ResolutionTests(unittest.TestCase):
             subtitles=root/'captions.ass'
             module.write_subs(subtitles,[],0,2)
             out=root/'out.mp4'
-            with patch('speaker_crop.crop_plan',return_value=([(0,0),(1,1040)],8)):
+            with patch('kelip.speaker_crop.crop_plan',return_value=([(0,0),(1,1040)],8)):
                 framing=module.render_clip(source,subtitles,out,0,2,'480')
             self.assertEqual(framing['mode'],'speaker_estimate')
             with av.open(str(out)) as video:
@@ -79,7 +79,7 @@ class ResolutionTests(unittest.TestCase):
             (root/"audio.wav").write_bytes(b"mock plan")
             ass = root/"captions.ass"; out = root/"out.mp4"
             module.write_subs(ass, [], 0, 1)
-            with patch("speaker_crop.crop_plan", return_value=([(0, 0), (.5, 736)], 4)) as plan:
+            with patch("kelip.speaker_crop.crop_plan", return_value=([(0, 0), (.5, 736)], 4)) as plan:
                 module.render_clip(source, ass, out, 0, 1, "480", framing_layout="wide")
             self.assertEqual(plan.call_args.args[-1], 684)
             with av.open(str(out)) as container:

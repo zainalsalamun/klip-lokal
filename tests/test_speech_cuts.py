@@ -1,6 +1,6 @@
 import unittest
-import app
-from speaker_crop import SpeakerTracker
+from kelip import app
+from kelip.speaker_crop import SpeakerTracker
 
 
 class SpeechCutTests(unittest.TestCase):

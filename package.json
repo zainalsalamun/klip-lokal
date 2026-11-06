@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "./dev.sh",
     "start": "./dev.sh",
-    "setup:ai": "python3 setup_local.py ai",
-    "setup": "python3 setup_local.py setup",
-    "doctor": "python3 setup_local.py doctor"
+    "setup:ai": "python3 -m kelip.setup_local ai",
+    "setup": "python3 -m kelip.setup_local setup",
+    "doctor": "python3 -m kelip.setup_local doctor"
   }
 }

@@ -11,13 +11,13 @@ Prioritas berikutnya adalah **membuat hasil otomatis mudah diperiksa dan dikorek
 | Temuan | Bukti pada implementasi | Dampak |
 | --- | --- | --- |
 | Caption manual masih disimpan di browser | `captionEditor()` pada `static/app.js`, key `klip-caption:` | Edit dapat hilang bila storage dibersihkan atau berpindah browser |
-| AI caption sudah memakai bahasa per studio, validasi dan retry | `summarize()`/`parse_summary()` pada `local_caption.py` | Mengurangi salah bahasa, tetapi bukan jaminan isi/grammar benar |
-| Subtitle berasal dari segmen dan pembagian kelompok kata | `write_subs()` pada `app.py` | Belum bisa membetulkan ucapan/nama/timing melalui UI |
-| Batas klip dan crop otomatis masih heuristik | `candidates()` dan `speaker_crop.py` | Kandidat bisa kehilangan konteks atau framing meleset |
-| Regenerasi caption sudah terpisah dari ekspor video | Endpoint caption pada `app.py` | Pola yang baik untuk diperluas ke edit manual yang tersimpan |
+| AI caption sudah memakai bahasa per studio, validasi dan retry | `summarize()`/`parse_summary()` pada `kelip/local_caption.py` | Mengurangi salah bahasa, tetapi bukan jaminan isi/grammar benar |
+| Subtitle berasal dari segmen dan pembagian kelompok kata | `write_subs()` pada `kelip/app.py` | Belum bisa membetulkan ucapan/nama/timing melalui UI |
+| Batas klip dan crop otomatis masih heuristik | `candidates()` dan `kelip/speaker_crop.py` | Kandidat bisa kehilangan konteks atau framing meleset |
+| Regenerasi caption sudah terpisah dari ekspor video | Endpoint caption pada `kelip/app.py` | Pola yang baik untuk diperluas ke edit manual yang tersimpan |
 | History sudah punya pencarian, pagination dan hapus pekerjaan | Route history dan editor JS | Sudah cukup untuk penggunaan awal; belum ada kuota/ukuran per pekerjaan atau hapus satu klip |
 | Worker berada dalam proses Flask | `process()` dan thread pada `create()` | Restart memutus pekerjaan; belum ada cancel/resume atau antrean durable |
-| Bootstrap/doctor sudah ada; target teruji macOS Apple Silicon | `setup_local.py` dan `docs/NEW_MACHINE.md` | Jangan mengklaim installer lintas OS sudah siap |
+| Bootstrap/doctor sudah ada; target teruji macOS Apple Silicon | `kelip/setup_local.py` dan `docs/NEW_MACHINE.md` | Jangan mengklaim installer lintas OS sudah siap |
 
 ## Rekomendasi prioritas
 

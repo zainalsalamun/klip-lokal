@@ -5,7 +5,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
-import app as module
+from kelip import app as module
 
 
 class GlobalStudioTests(unittest.TestCase):

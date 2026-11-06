@@ -6,15 +6,15 @@ Panduan memilih alur kerja untuk developer dan coding agent Klip lokal. Baca [AG
 
 | Kebutuhan | Source utama | Referensi dan verifikasi |
 | --- | --- | --- |
-| Instalasi komputer baru | `setup_local.py`, `dev.sh`, `Mulai.command`, `package.json` | [NEW_MACHINE](docs/NEW_MACHINE.md), `test_setup_local.py`, setup pada environment terpisah |
-| Menjalankan/mendiagnosis server | `serverctl.py`, `app.py` | [SETUP](docs/SETUP.md), [TROUBLESHOOTING](docs/TROUBLESHOOTING.md), health dan log saat idle |
-| Pemilihan/batas waktu klip | `candidates()` di `app.py` | [ARCHITECTURE](docs/ARCHITECTURE.md), `test_speech_cuts.py`, periksa audio awal/akhir klip nyata |
-| Crop mengikuti pembicara | `speaker_crop.py`, `render_clip()` | `test_speech_cuts.py`, `test_resolution.py`, video multipembicara dan fallback |
-| Tampilan subtitle/resolusi | `subtitle_styles.py`, `write_subs()`, template dan JS | `test_subtitle_styles.py`, `test_resolution.py`, preview serta MP4 nyata |
-| Caption AI lokal | `local_caption.py`, endpoint caption dan editor JS | [LOCAL_AI](docs/LOCAL_AI.md), `test_local_caption.py`, contoh model nyata jika prompt berubah |
-| Studio Anak dan ekspor turunan | `kids_content.py`, `clip_exports.py`, endpoint kids/exports dan editor JS | [K2/K3](docs/reviews/KIDS_K2_K3_IMPLEMENTATION.md), `test_kids_pipeline_exports.py`, media fixture dan browser live terisolasi |
-| History, pencarian dan hapus | Route metadata di `app.py`, `static/app.js` | [API](docs/API.md), `test_history.py`, `test_history_pagination.py` |
-| Studio Global | `global_content.py`, worker dan template | [GLOBAL](docs/GLOBAL.md), `test_global_studio.py`; audio tetap asli |
+| Instalasi komputer baru | `kelip/setup_local.py`, `dev.sh`, `Mulai.command`, `package.json` | [NEW_MACHINE](docs/NEW_MACHINE.md), `test_setup_local.py`, setup pada environment terpisah |
+| Menjalankan/mendiagnosis server | `kelip/serverctl.py`, `kelip/app.py` | [SETUP](docs/SETUP.md), [TROUBLESHOOTING](docs/TROUBLESHOOTING.md), health dan log saat idle |
+| Pemilihan/batas waktu klip | `candidates()` di `kelip/app.py` | [ARCHITECTURE](docs/ARCHITECTURE.md), `test_speech_cuts.py`, periksa audio awal/akhir klip nyata |
+| Crop mengikuti pembicara | `kelip/speaker_crop.py`, `render_clip()` | `test_speech_cuts.py`, `test_resolution.py`, video multipembicara dan fallback |
+| Tampilan subtitle/resolusi | `kelip/subtitle_styles.py`, `write_subs()`, template dan JS | `test_subtitle_styles.py`, `test_resolution.py`, preview serta MP4 nyata |
+| Caption AI lokal | `kelip/local_caption.py`, endpoint caption dan editor JS | [LOCAL_AI](docs/LOCAL_AI.md), `test_local_caption.py`, contoh model nyata jika prompt berubah |
+| Studio Anak dan ekspor turunan | `kelip/kids_content.py`, `kelip/clip_exports.py`, endpoint kids/exports dan editor JS | [K2/K3](docs/reviews/KIDS_K2_K3_IMPLEMENTATION.md), `test_kids_pipeline_exports.py`, media fixture dan browser live terisolasi |
+| History, pencarian dan hapus | Route metadata di `kelip/app.py`, `static/app.js` | [API](docs/API.md), `test_history.py`, `test_history_pagination.py` |
+| Studio Global | `kelip/global_content.py`, worker dan template | [GLOBAL](docs/GLOBAL.md), `test_global_studio.py`; audio tetap asli |
 | UI dan dropdown | `templates/index.html`, `static/` | [USAGE](docs/USAGE.md), browser desktop/layar sempit dan keyboard |
 | Penanganan error frontend | `api()`, polling dan rendering di JS | `tests/test_api_errors.cjs`, respons jaringan/API dan kesalahan UI |
 

@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import tempfile
 import unittest
 from unittest.mock import patch
-import setup_local as setup
-import local_caption as ai
+from kelip import setup_local as setup
+from kelip import local_caption as ai
 
 
 class SetupTests(unittest.TestCase):

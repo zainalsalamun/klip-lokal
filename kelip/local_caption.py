@@ -18,7 +18,7 @@ DetectorFactory.seed = 0
 
 MODEL = 'qwen3:1.7b'
 BASE = 'http://127.0.0.1:11434'
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 runtime_lock = threading.Lock()
 inference_lock = threading.Lock()
 opener = build_opener(ProxyHandler({}))

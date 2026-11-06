@@ -108,7 +108,7 @@ def crop_plan(source, audio, start, end, width, height):
     import av
     import cv2
     import numpy as np
-    from media_quality import scaled_size
+    from .media_quality import scaled_size
     levels = speech_levels(audio, start, end)
     detector = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
     if detector.empty():

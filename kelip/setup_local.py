@@ -10,7 +10,7 @@ import subprocess
 import sys
 from urllib.request import build_opener, ProxyHandler
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 IMPORTS = 'flask yt_dlp imageio_ffmpeg faster_whisper av cv2 langdetect'.split()
 
 class SetupError(RuntimeError): pass
@@ -130,7 +130,7 @@ def main():
     try:
         if args.action=='doctor': return doctor(args.skip_ai)
         python=setup()
-        if args.action=='ai': run([python,ROOT/'local_caption.py'])
+        if args.action=='ai': run([python, '-m', 'kelip.local_caption'])
         return 0
     except (SetupError,OSError) as exc:
         print(f'Setup belum selesai: {exc}',file=sys.stderr)
