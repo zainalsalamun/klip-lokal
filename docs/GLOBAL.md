@@ -4,7 +4,7 @@ Buka menu **Studio Global** atau `/global` setelah menjalankan server versi terb
 
 ## Cara penggunaan
 
-1. Buka Studio Global.
+1. Buka Studio Global. Form dimulai dengan sumber kosong dan pengaturan bawaan.
 2. Tinjau empat ide editorial: kebiasaan/produktivitas, teknologi praktis, cerita karier, dan budaya Indonesia.
 3. Klik **Pakai fokus ini** untuk mengatur fokus kandidat dan contoh durasi. Tombol ini tidak mencari atau mengunduh video otomatis.
 4. Masukkan URL YouTube atau unggah sumber yang relevan. **Cari referensi** membuka pencarian YouTube; pilih sumber sendiri.
@@ -12,7 +12,7 @@ Buka menu **Studio Global** atau `/global` setelah menjalankan server versi terb
 6. Proses video. Whisper menerjemahkan audio sumber menjadi segmen bahasa Inggris; segmen itu dipakai untuk subtitle, scoring dan caption.
 7. Tinjau subtitle, nama orang/istilah, crop dan konteks. Edit caption posting, salin atau unduh TXT.
 
-Riwayat lokal dan Global ditampilkan bersama. Pekerjaan Global diberi keterangan **English subtitles**. Membuka history lokal di Studio Global tidak menerjemahkan hasil lama secara otomatis; kirim sumber kembali melalui form Global untuk membuat pekerjaan baru. Mode form mengikuti halaman yang sedang dibuka.
+Riwayat lokal dan Global ditampilkan bersama. Pekerjaan Global diberi keterangan **English subtitles**. Kamu tetap bisa membuka hasil Studio Klip lewat **Riwayat klip** di Studio Global. Form Global hanya mengambil sumber dan pengaturan dari pekerjaan Global yang kamu buka. Untuk membuat versi Inggris dari video lokal, masukkan sendiri sumbernya ke form Global.
 
 ## Cara pemrosesan
 

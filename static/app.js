@@ -1,4 +1,5 @@
 const form = document.querySelector('#form');
+const isGlobalStudio = document.body.classList.contains('global-studio');
 const button = document.querySelector('#submit');
 const statusEl = document.querySelector('#status');
 const errorEl = document.querySelector('#error');
@@ -1246,7 +1247,7 @@ async function deleteJob(job, remove) {
       errorEl.textContent = '';
     }
     const remaining = await refreshHistory();
-    if (location.hash !== '#history' && !selectedJobId && remaining.length) await openJob(activeJobId || remaining[0].id);
+    if (location.hash !== '#history' && !isGlobalStudio && !selectedJobId && remaining.length) await openJob(activeJobId || remaining[0].id);
     historyMessage.textContent = 'Riwayat dan semua berkas pekerjaan berhasil dihapus dari disk.';
   } catch (error) {
     remove.disabled = false;
@@ -1289,7 +1290,7 @@ async function openJob(id) {
     const kidsSourceForm = form?.elements.content_profile?.value === 'kids';
     const matchesBrief = !kidsSourceForm || (job.content_profile === 'kids' &&
       job.kids_metadata?.brief_id === form.elements.brief_id.value);
-    const matchesForm = form && matchesBrief;
+    const matchesForm = form && matchesBrief && (job.audience || 'local') === (form.elements.audience?.value || 'local');
     const urlInput = document.querySelector('#url');
     if (urlInput && matchesForm) urlInput.value = job.source_url || '';
     const vidInput = document.querySelector('#video');
@@ -1987,7 +1988,7 @@ async function init() {
     if (button) button.disabled = Boolean(activeJobId);
     let saved; try { saved = localStorage.getItem('klip-selected') || localStorage.getItem('klip-job'); } catch (_) {}
     const selectedId = saved || activeJobId || jobs[0]?.id;
-    if (selectedId && location.hash !== '#history' && !(document.body.classList.contains('kids-studio') || document.body.classList.contains('kids-source'))) {
+    if (selectedId && !isGlobalStudio && location.hash !== '#history' && !(document.body.classList.contains('kids-studio') || document.body.classList.contains('kids-source'))) {
       await openJob(selectedId);
     }
     if (activeJobId && !(document.body.classList.contains('kids-studio') || document.body.classList.contains('kids-source'))) poll(activeJobId);
