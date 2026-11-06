@@ -158,11 +158,13 @@ function hasUnsavedCaptionEdits() {
   return Boolean(document.querySelector('.caption-editor.has-unsaved, .watermark-editor.has-unsaved, #kids-brief-section.has-unsaved'));
 }
 window.addEventListener('beforeunload', event => {
-  if (hasUnsavedCaptionEdits()) {
+  if (!leavingStudio && hasUnsavedCaptionEdits()) {
     event.preventDefault();
     event.returnValue = '';
   }
 });
+const draftSavers = new WeakMap();
+let leavingStudio = false;
 function captionEditor(clip, index, jobId, audience) {
   const box = document.createElement('section'); box.className = 'caption-editor';
   const clipId = clip.clip_id || String(index);
@@ -172,6 +174,67 @@ function captionEditor(clip, index, jobId, audience) {
 
   const header = document.createElement('div'); header.className = 'caption-editor-header';
   const label = document.createElement('label'); label.textContent = 'Caption posting'; label.htmlFor = 'caption-' + clipId;
+const studioLinks = '#app-sidebar .nav:not(.history-nav), .studio-switch a';
+document.addEventListener('click', event => {
+  const link = event.target.closest(studioLinks);
+  if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey ||
+      event.shiftKey || event.altKey || !hasUnsavedCaptionEdits()) return;
+
+  event.preventDefault();
+  const dialog = document.createElement('dialog');
+  dialog.className = 'delete-dialog studio-draft-dialog';
+  dialog.setAttribute('aria-labelledby', 'studio-draft-title');
+  dialog.innerHTML = `<h2 id="studio-draft-title">Simpan perubahan sebelum pindah?</h2>
+    <p class="studio-draft-summary"></p>
+    <div class="delete-dialog-actions">
+      <button type="button" class="delete-dialog-cancel" autofocus>Batal</button>
+      <button type="button" class="delete-dialog-cancel studio-draft-discard">Pindah tanpa simpan</button>
+      <button type="button" class="studio-draft-save">Simpan dan pindah</button>
+    </div>`;
+  const drafts = [...document.querySelectorAll('.caption-editor.has-unsaved, .watermark-editor.has-unsaved, #kids-brief-section.has-unsaved')];
+  const draftTypes = [...new Set(drafts.map(editor => {
+    if (editor.classList.contains('caption-editor')) return 'caption';
+    if (editor.classList.contains('watermark-editor')) return 'watermark';
+    return 'brief';
+  }))];
+  dialog.querySelector('.studio-draft-summary').textContent = 'Perubahan belum disimpan pada ' + draftTypes.join(', ') + '.';
+  const save = dialog.querySelector('.studio-draft-save');
+  let saving = false;
+
+  function leave() {
+    leavingStudio = true;
+    dialog.close();
+    location.assign(link.href);
+  }
+
+  dialog.querySelector('button').addEventListener('click', () => dialog.close());
+  dialog.querySelector('.studio-draft-discard').addEventListener('click', leave);
+  dialog.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
+  dialog.addEventListener('close', () => dialog.remove(), {once: true});
+  save.addEventListener('click', async () => {
+    saving = true;
+    dialog.querySelectorAll('button').forEach(button => { button.disabled = true; });
+    save.textContent = 'Menyimpan…';
+    for (const editor of drafts) {
+      await draftSavers.get(editor)?.();
+      if (editor.classList.contains('has-unsaved')) {
+        dialog.close();
+        if (location.hash === '#history') {
+          history.replaceState(null, '', location.pathname + location.search);
+          syncView();
+        }
+        editor.scrollIntoView({block: 'center'});
+        return;
+      }
+    }
+    leave();
+  });
+  document.body.append(dialog);
+  dialog.showModal();
+}, true);
+
+window.addEventListener('pageshow', () => { leavingStudio = false; });
+
   const targetBadge = document.createElement('span'); targetBadge.className = 'caption-target-badge';
   targetBadge.textContent = audience === 'global_en' ? 'Target AI: English' : 'Target AI: Indonesia';
   header.append(label, targetBadge);
@@ -294,7 +357,7 @@ function captionEditor(clip, index, jobId, audience) {
     }
   }
 
-  saveBtn.addEventListener('click', async () => {
+  async function saveDraft() {
     if (isBusy || !isDirty()) return;
     isBusy = true;
     syncDirtyState();
@@ -328,7 +391,9 @@ function captionEditor(clip, index, jobId, audience) {
       isBusy = false;
       syncDirtyState();
     }
-  });
+  }
+  saveBtn.addEventListener('click', saveDraft);
+  draftSavers.set(box, saveDraft);
 
   function showConflictUI(data) {
     conflictBanner.replaceChildren(); conflictBanner.hidden = false;
@@ -772,8 +837,6 @@ function watermarkEditor(clip, index, jobId) {
       img.onload = () => {
         if (loadId !== currentLogoLoadId || currentWm.type !== 'logo' || currentWm.asset_id !== activeAssetId) return;
         if (img.naturalWidth && img.naturalHeight) {
-          currentWm.asset_width = img.naturalWidth;
-          currentWm.asset_height = img.naturalHeight;
           if (logoInfo && (!logoInfo.textContent || logoInfo.textContent === 'Logo tersimpan')) {
             logoInfo.textContent = 'Logo (' + img.naturalWidth + '×' + img.naturalHeight + 'px)';
           }
@@ -946,7 +1009,7 @@ function watermarkEditor(clip, index, jobId) {
     }
   });
 
-  saveBtn.addEventListener('click', async () => {
+  async function saveDraft() {
     if (isBusy || !isDirty()) return;
     isBusy = true;
     syncDirtyState();
@@ -984,7 +1047,9 @@ function watermarkEditor(clip, index, jobId) {
       isBusy = false;
       syncDirtyState();
     }
-  });
+  }
+  saveBtn.addEventListener('click', saveDraft);
+  draftSavers.set(box, saveDraft);
 
   function showConflictUI(data) {
     conflictBanner.replaceChildren(); conflictBanner.hidden = false;
@@ -1488,7 +1553,7 @@ function initKidsStudio() {
   }
   document.addEventListener('click', event => {
     const link = event.target.closest('a[href]');
-    if (!link || (!isDirty && !isSaving) || link.target === '_blank') return;
+    if (!link || event.defaultPrevented || link.matches(studioLinks + ', .history-nav') || (!isDirty && !isSaving) || link.target === '_blank') return;
     const target = new URL(link.href, location.href);
     if (target.origin !== location.origin) return;
     if (isSaving || !window.confirm('Ada perubahan brief yang belum disimpan. Tetap tinggalkan editor?')) {
@@ -1726,6 +1791,7 @@ function initKidsStudio() {
       }
       currentBriefId = null;
       serverRevision = 1;
+  draftSavers.set(briefPanel, saveBrief);
       savedBrief = null;
       conflictBrief = null;
       isDirty = false;

@@ -72,6 +72,7 @@ function makeEditor(apiFn) {
       setItem: (k, v) => { localStorageData[k] = String(v); },
       removeItem: (k) => { delete localStorageData[k]; }
     },
+    draftSavers: new WeakMap(),
     formatTime: () => '0:00',
     makeCaption: () => 'Caption awal',
     formatSaveTime: () => ' (10:00)',

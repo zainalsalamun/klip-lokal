@@ -381,9 +381,18 @@ class RealBrowserCaptionTests(unittest.TestCase):
         serverJobState.caption = 'Versi terbaru yang disimpan sesi lain';
         serverJobState.metadata_revision = 2;
 
-        // Coba simpan (dengan expected_revision = 1) -> memicu 409 conflict
-        saveBtn.click();
+        const globalLink = document.querySelector('#app-sidebar a[href="/global"]');
+        globalLink.click();
+        const dialog = document.querySelector('.studio-draft-dialog');
+        assert(dialog.open && dialog.textContent.includes('caption'), 'Pindah studio menampilkan pilihan simpan caption');
+        dialog.querySelector('.delete-dialog-cancel').click();
+        assert(!dialog.open && ta.value === 'Draft penting pengguna', 'Batal mempertahankan draft');
+
+        // Simpan dari dialog navigasi. Revisi lama memicu 409 dan mencegah pindah.
+        globalLink.click();
+        document.querySelector('.studio-draft-dialog[open] .studio-draft-save').click();
         await new Promise(r => setTimeout(r, 60));
+        assert(!document.querySelector('.studio-draft-dialog[open]'), 'Kegagalan simpan mengembalikan pengguna ke editor');
 
         assert(!conflictBanner.hidden, 'Banner konflik ditampilkan di DOM');
         assert(conflictBanner.textContent.includes('Konflik revisi'), 'Pesan konflik ditampilkan');
@@ -404,6 +413,16 @@ class RealBrowserCaptionTests(unittest.TestCase):
         assert(!box.classList.contains('has-unsaved'), 'Status dirty bersih setelah memilih versi server');
         assert(saveBtn.disabled === true, 'Tombol Simpan nonaktif setelah memilih versi server');
         assert(hasUnsavedCaptionEdits() === false, 'Penjaga navigasi bersih setelah memilih versi server');
+
+        // Gunakan tujuan fragment agar hasil pengujian tetap berada di halaman fixture.
+        globalLink.setAttribute('href', '#studio-fixture');
+        ta.value = 'Caption disimpan saat pindah studio';
+        ta.dispatchEvent(new Event('input'));
+        globalLink.click();
+        document.querySelector('.studio-draft-dialog[open] .studio-draft-save').click();
+        await new Promise(r => setTimeout(r, 60));
+        assert(serverJobState.caption === ta.value && !hasUnsavedCaptionEdits(), 'Simpan dan pindah menyimpan caption');
+        assert(location.hash === '#studio-fixture', 'Navigasi dilanjutkan setelah simpan sukses');
         """
         logs = self._run_chrome_test(script, window_size="1280,800")
         self.assertGreater(len(logs), 8)
