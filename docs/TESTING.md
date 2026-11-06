@@ -65,3 +65,6 @@ Regresi keamanan/state K1: `test_kids_studio.py` memeriksa markup literal tersim
 
 
 K2/K3: `test_kids_pipeline_exports.py` memakai direktori sementara untuk mode/bahasa, snapshot brief, route sumber, ucapan kosong, AI unavailable, busy/revisi/idempotensi dan kegagalan ekspor. Render FFmpeg nyata memeriksa MP4 watermark (piksel/dimensi/audio), PNG landscape dan hash sumber yang tetap. ASR/Ollama memakai mock; tes ini tidak membuktikan akurasi narasi/gambar atau kesesuaian usia. Browser smoke live terpisah memakai video warna/audio sinus sintetis, bukan data pengguna.
+
+
+Smoke live K2/K3: lihat [hasil dan batas](reviews/KIDS_K2_K3_SMOKE_TEST.md). Launcher `tests/serve_kids_smoke.py --data outputs/kids-smoke/live` memakai fixture sintetis terpisah dan tidak mengunduh model. Tambahkan `runtime/node_modules/node/bin/node tests/test_kids_source_history.cjs` untuk regresi prefill history berbeda agar bahasa/form Studio Anak tetap mengikuti brief. Uji browser nyata tetap diperlukan; VM hanya membuktikan aturan prefill.

@@ -45,3 +45,5 @@ Perubahan UI/input memperbarui USAGE; endpoint memperbarui API; dependensi/launc
 Gunakan tautan relatif antarberkas. Jangan memasukkan path laptop pribadi atau isi data pengguna. Jika menambah dokumen, daftarkan di halaman ini agar mudah ditemukan.
 
 Catatan implementasi terbaru: [Studio Anak K2/K3 dan batas ekspor](reviews/KIDS_K2_K3_IMPLEMENTATION.md).
+
+Bukti pengujian live: [Smoke test Studio Anak K2/K3](reviews/KIDS_K2_K3_SMOKE_TEST.md).
