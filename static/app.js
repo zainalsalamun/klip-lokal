@@ -1767,7 +1767,7 @@ function initKidsStudio() {
     return [
       '='.repeat(80),
       'BRIEF PRODUKSI KONTEN ANAK (3–5 TAHUN · BAHASA INDONESIA)',
-      'Klip Lokal — Studio Anak',
+      'Kelip Studio — Studio Anak',
       '='.repeat(80),
       `Judul Kerja      : ${title}`,
       `Target Usia      : 3–5 tahun`,

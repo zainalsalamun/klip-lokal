@@ -1,5 +1,7 @@
 # Usulan pengembangan
 
+**Arah saat ini:** Kelip Studio berfokus pada versi lokal. Akun, pembayaran dan SaaS online ditunda. Prioritaskan kualitas hasil, editor koreksi dan penggunaan laptop8GB. Status implementasi terbaru ada pada catatan K2/K3; bagian usulan lama di bawah tetap menjadi referensi perencanaan.
+
 Daftar ini adalah bahan perencanaan, **bukan fitur yang sudah tersedia atau janji jadwal**. Prioritas akhir mengikuti kebutuhan pengguna dan bukti pengujian.
 
 | Usulan | Manfaat | Bukti selesai yang diperlukan |

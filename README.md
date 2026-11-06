@@ -1,4 +1,6 @@
-# Klip — YouTube clipper lokal
+# Kelip Studio — clipper dengan AI lokal
+
+**Kelip Studio** menggunakan logo **k✳lip.**, dengan simbol ✳ mewakili huruf E. Fokus pengembangan saat ini adalah aplikasi lokal.
 
 Aplikasi web lokal untuk mengambil video YouTube atau file video, mentranskripsi suara, memilih kandidat klip, dan mengekspor MP4 vertikal dengan subtitle.
 

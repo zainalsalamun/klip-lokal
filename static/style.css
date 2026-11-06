@@ -239,3 +239,6 @@ main{margin-left:230px;padding:0 40px;max-width:1500px}
 .clip-output-tools button{width:auto;margin:0;padding:10px;font-size:11px}.clip-output-tools button:disabled{opacity:.55;cursor:wait}
 .clip-export-list{display:flex;flex-direction:column;gap:12px;overflow-wrap:anywhere;font-size:11px;line-height:1.7}.clip-export-list img{display:block;max-width:100%;max-height:230px;object-fit:contain;margin-top:8px}
 .brief-heading-actions{flex-wrap:wrap}.brief-heading-actions button{width:auto;font-size:11px;margin:0;padding:10px}.brief-heading-actions button:disabled{opacity:.5;cursor:not-allowed}
+
+/* Kelip Studio: the star in k✳lip. represents E. */
+.brand{display:inline-block}.brand>small{display:block;font:600 9px/1.5 'DM Sans',Arial,sans-serif;letter-spacing:3px;margin:4px 0 0 3px;color:#71862e}
