@@ -10,11 +10,20 @@ const historyPanel = document.querySelector('#history');
 const studioContent = document.querySelector('#studio-content');
 const newJobButton = document.querySelector('#new-job');
 const historyNav = document.querySelector('.history-nav');
+const results = document.querySelector('#results');
+const clipsGrid = document.querySelector('#clips');
+const historyResultStatus = document.createElement('p');
+historyResultStatus.setAttribute('role', 'status');
+let resultsInHistory = false;
+
+function syncResultsVisibility() {
+  results.hidden = resultsInHistory !== (location.hash === '#history') || !clipsGrid.children.length;
+}
 function syncView() {
   const showingHistory = location.hash === '#history';
   historyPanel.hidden = !showingHistory;
   studioContent.hidden = showingHistory;
-  document.querySelector('#results').hidden = showingHistory || !document.querySelector('#clips').children.length;
+  syncResultsVisibility();
   historyNav.classList.toggle('active', showingHistory);
   historyNav.toggleAttribute('aria-current', showingHistory);
   if (showingHistory) historyNav.setAttribute('aria-current', 'page');
@@ -67,7 +76,7 @@ historyTools.innerHTML = '<label class="history-search">Cari riwayat<input type=
 historyMessage.before(historyTools);
 const pagination = document.createElement('nav'); pagination.className = 'history-pagination'; pagination.setAttribute('aria-label', 'Halaman riwayat');
 pagination.innerHTML = '<span id="history-range" role="status"></span><div><button type="button" id="history-prev" aria-label="Halaman sebelumnya">← Sebelumnya</button><span id="history-page"></span><button type="button" id="history-next" aria-label="Halaman berikutnya">Berikutnya →</button></div>';
-historyList.after(pagination);
+historyList.after(pagination, historyResultStatus);
 function historyError(error) { historyMessage.textContent = error instanceof ConnectionError ? connectionMessage : 'Riwayat tidak dapat dimuat: ' + error.message; }
 document.querySelector('#history-search').addEventListener('input', event => {
   historyState.query = event.target.value.trim(); historyState.page = 1;
@@ -154,6 +163,8 @@ function formatSaveTime(isoString) {
   if (Number.isNaN(d.getTime())) return '';
   return ' (' + d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}) + ')';
 }
+const draftSavers = new WeakMap();
+let leavingStudio = false;
 function hasUnsavedCaptionEdits() {
   return Boolean(document.querySelector('.caption-editor.has-unsaved, .watermark-editor.has-unsaved, #kids-brief-section.has-unsaved'));
 }
@@ -163,17 +174,6 @@ window.addEventListener('beforeunload', event => {
     event.returnValue = '';
   }
 });
-const draftSavers = new WeakMap();
-let leavingStudio = false;
-function captionEditor(clip, index, jobId, audience) {
-  const box = document.createElement('section'); box.className = 'caption-editor';
-  const clipId = clip.clip_id || String(index);
-  let savedCaption = clip.caption ?? (clip.text ? makeCaption(clip.text, audience) : '');
-  let currentRevision = clip.caption_revision || clip.metadata_revision || 1;
-  let isBusy = false;
-
-  const header = document.createElement('div'); header.className = 'caption-editor-header';
-  const label = document.createElement('label'); label.textContent = 'Caption posting'; label.htmlFor = 'caption-' + clipId;
 const studioLinks = '#app-sidebar .nav:not(.history-nav), .studio-switch a';
 document.addEventListener('click', event => {
   const link = event.target.closest(studioLinks);
@@ -219,7 +219,7 @@ document.addEventListener('click', event => {
       await draftSavers.get(editor)?.();
       if (editor.classList.contains('has-unsaved')) {
         dialog.close();
-        if (location.hash === '#history') {
+        if (location.hash === '#history' && !editor.getClientRects().length) {
           history.replaceState(null, '', location.pathname + location.search);
           syncView();
         }
@@ -235,6 +235,15 @@ document.addEventListener('click', event => {
 
 window.addEventListener('pageshow', () => { leavingStudio = false; });
 
+function captionEditor(clip, index, jobId, audience) {
+  const box = document.createElement('section'); box.className = 'caption-editor';
+  const clipId = clip.clip_id || String(index);
+  let savedCaption = clip.caption ?? (clip.text ? makeCaption(clip.text, audience) : '');
+  let currentRevision = clip.caption_revision || clip.metadata_revision || 1;
+  let isBusy = false;
+
+  const header = document.createElement('div'); header.className = 'caption-editor-header';
+  const label = document.createElement('label'); label.textContent = 'Caption posting'; label.htmlFor = 'caption-' + clipId;
   const targetBadge = document.createElement('span'); targetBadge.className = 'caption-target-badge';
   targetBadge.textContent = audience === 'global_en' ? 'Target AI: English' : 'Target AI: Indonesia';
   header.append(label, targetBadge);
@@ -1172,7 +1181,6 @@ function render(job) {
   }
   const resultsNote = document.querySelector('#results-note') || document.querySelector('#results .results-head p');
   if (resultsNote) resultsNote.textContent = job.content_profile === 'kids' ? 'Kandidat untuk ditinjau · Anak 3–5 · Indonesia. Tujuan brief: ' + (job.kids_metadata?.brief_snapshot?.learning_goal || 'Tinjau konsep pembelajaran') + '. Label ini bukan sertifikasi kesesuaian usia.' : job.audience === 'global_en' ? 'Subtitle dan caption: English · suara asli dipertahankan. Tinjau terjemahan dan konteks sebelum posting.' : 'Pilihan berdasarkan transkrip, bukan jaminan viral. Tinjau framing dan batas ucapan sebelum posting.';
-  document.querySelector('#results').hidden = location.hash === '#history' || !job.clips?.length;
   document.querySelector('#result-title').textContent = job.title || 'Klip siap ditinjau';
   const grid = document.querySelector('#clips');
   grid.replaceChildren();
@@ -1191,8 +1199,15 @@ function render(job) {
     card.append(video, heading, time, framing, quality, text, download, captionEditor(c, i, job.id, job.audience), watermarkEditor(c, i, job.id), clipOutputTools(c, job, i)); grid.append(card);
   });
   window.KlipSelect?.mount(grid);
+  syncResultsVisibility();
 }
 function display(job) {
+  if (resultsInHistory) {
+    historyResultStatus.textContent = job.error || (!job.done ? job.status + ' · ' + (job.progress || 0) + '%' :
+      job.clips?.length ? '' : 'Pekerjaan ini belum memiliki hasil klip.');
+    render(job);
+    return;
+  }
   const progEl = document.querySelector('#progress');
   if (progEl) progEl.hidden = false;
   if (statusEl) statusEl.textContent = job.status;
@@ -1307,9 +1322,11 @@ async function deleteJob(job, remove) {
     if (selectedJobId === job.id) {
       ++selectionVersion; selectedJobId = null; remember(null);
       document.querySelector('#results').hidden = true;
-      document.querySelector('#clips').replaceChildren();
-      document.querySelector('#progress').hidden = true;
-      errorEl.textContent = '';
+      clipsGrid.replaceChildren();
+      historyResultStatus.textContent = '';
+      const progress = document.querySelector('#progress');
+      if (progress) progress.hidden = true;
+      if (errorEl) errorEl.textContent = '';
     }
     const remaining = await refreshHistory();
     if (location.hash !== '#history' && !isGlobalStudio && !selectedJobId && remaining.length) await openJob(activeJobId || remaining[0].id);
@@ -1342,10 +1359,23 @@ async function refreshHistory() {
   renderHistory(data.jobs); return data.jobs;
 }
 async function openJob(id) {
-  if (selectedJobId && selectedJobId !== id && hasUnsavedCaptionEdits()) {
+  const fromHistory = location.hash === '#history';
+  if (selectedJobId && selectedJobId !== id &&
+      (fromHistory ? results.querySelector('.has-unsaved') : hasUnsavedCaptionEdits())) {
     if (!window.confirm('Ada perubahan caption yang belum disimpan ke server. Tetap pindah video tanpa menyimpan?')) return;
   }
-  if (location.hash === '#history') { history.replaceState(null, '', location.pathname + location.search); syncView(); window.scrollTo(0, 0); }
+  if (fromHistory && selectedJobId === id && clipsGrid.children.length) {
+    resultsInHistory = true;
+    syncResultsVisibility();
+    results.scrollIntoView({block: 'start'});
+    return;
+  }
+  if (fromHistory) {
+    resultsInHistory = true;
+    clipsGrid.replaceChildren();
+    syncResultsVisibility();
+    historyResultStatus.textContent = 'Memuat hasil klip…';
+  }
   const version = ++selectionVersion;
   selectedJobId = id; remember(id); selectHistoryRow();
   if (mobileWidth.matches && document.body.classList.contains('sidebar-open')) setSidebar(false);
@@ -1355,7 +1385,7 @@ async function openJob(id) {
     const kidsSourceForm = form?.elements.content_profile?.value === 'kids';
     const matchesBrief = !kidsSourceForm || (job.content_profile === 'kids' &&
       job.kids_metadata?.brief_id === form.elements.brief_id.value);
-    const matchesForm = form && matchesBrief && (job.audience || 'local') === (form.elements.audience?.value || 'local');
+    const matchesForm = !fromHistory && form && matchesBrief && (job.audience || 'local') === (form.elements.audience?.value || 'local');
     const urlInput = document.querySelector('#url');
     if (urlInput && matchesForm) urlInput.value = job.source_url || '';
     const vidInput = document.querySelector('#video');
@@ -1375,14 +1405,24 @@ async function openJob(id) {
       syncFormat();
     }
     display(job);
+    if (fromHistory && !results.hidden) results.scrollIntoView({block: 'start'});
     if (!job.done && !activeJobId) { activeJobId = id; if (button) button.disabled = true; poll(id); }
-  } catch (error) { if (version === selectionVersion) showError(error instanceof ConnectionError ? connectionMessage : 'Hasil belum dapat ditampilkan: ' + error.message); }
+  } catch (error) {
+    if (version !== selectionVersion) return;
+    const message = error instanceof ConnectionError ? connectionMessage : 'Hasil belum dapat ditampilkan: ' + error.message;
+    if (fromHistory) historyResultStatus.textContent = message;
+    else showError(message);
+  }
 }
 async function poll(id) {
   let job;
   try { job = await api('/api/jobs/' + encodeURIComponent(id)); }
   catch (error) {
-    if (selectedJobId === id) showError(error instanceof ConnectionError ? connectionMessage : 'Status belum dapat dimuat: ' + error.message);
+    if (selectedJobId === id) {
+      const message = error instanceof ConnectionError ? connectionMessage : 'Status belum dapat dimuat: ' + error.message;
+      if (resultsInHistory) historyResultStatus.textContent = message;
+      else showError(message);
+    }
     timer = setTimeout(() => poll(id), 4000); return;
   }
   if (job.done) {
@@ -1426,6 +1466,9 @@ if (newJobBtn) {
     }
     history.replaceState(null, '', location.pathname + location.search); syncView(); window.scrollTo(0, 0);
     ++selectionVersion; selectedJobId = null; remember(null);
+    resultsInHistory = false;
+    clipsGrid.replaceChildren();
+    historyResultStatus.textContent = '';
     if (form) { form.reset(); syncFormat(); }
     const upl = document.querySelector('#upload-label');
     if (upl) upl.textContent = '＋ Pilih file video';
@@ -1460,6 +1503,9 @@ if (form) {
       const result = await api('/api/jobs', {method:'POST', body:new FormData(form)});
       clearTimeout(timer); ++selectionVersion;
       activeJobId = selectedJobId = result.id; remember(result.id);
+      resultsInHistory = false;
+      clipsGrid.replaceChildren();
+      historyResultStatus.textContent = '';
       try { localStorage.setItem('klip-job', result.id); } catch (_) {}
       const resEl = document.querySelector('#results');
       if (resEl) resEl.hidden = true;
@@ -1740,6 +1786,7 @@ function initKidsStudio() {
   }
 
   if (saveBtn) saveBtn.addEventListener('click', saveBrief);
+  draftSavers.set(briefPanel, saveBrief);
 
   if (useServerBtn) {
     useServerBtn.addEventListener('click', () => {
@@ -1791,7 +1838,6 @@ function initKidsStudio() {
       }
       currentBriefId = null;
       serverRevision = 1;
-  draftSavers.set(briefPanel, saveBrief);
       savedBrief = null;
       conflictBrief = null;
       isDirty = false;
@@ -2057,7 +2103,7 @@ async function init() {
     if (selectedId && !isGlobalStudio && location.hash !== '#history' && !(document.body.classList.contains('kids-studio') || document.body.classList.contains('kids-source'))) {
       await openJob(selectedId);
     }
-    if (activeJobId && !(document.body.classList.contains('kids-studio') || document.body.classList.contains('kids-source'))) poll(activeJobId);
+    if (activeJobId) poll(activeJobId);
   } catch (error) {
     if (historyMessage) historyMessage.textContent = error instanceof ConnectionError ? connectionMessage : 'Riwayat tidak dapat dimuat: ' + error.message;
   }

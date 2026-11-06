@@ -154,6 +154,29 @@ class RealBrowserKidsStudioTests(unittest.TestCase):
         """
         self._run_chrome_test(js)
 
+    def test_history_opens_results_without_showing_kids_editor(self):
+        script = """
+        const job = {id:'history-job', title:'Klip dari Studio Klip', done:true, clip_count:1,
+          audience:'local', clips:[{clip_id:'clip-1', url:'fixture.mp4', start:0, end:4, text:'Fixture'}]};
+        window.api = async path => path.startsWith('/api/jobs/') ? job : {presets:[]};
+        location.hash = '#history';
+        await new Promise(resolve => setTimeout(resolve, 50));
+        renderHistory([job]);
+        document.querySelector('.history-row').click();
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        assert(location.hash === '#history', 'Hasil dibuka di Riwayat');
+        assert(!document.querySelector('#history').hidden, 'Daftar riwayat tetap terlihat');
+        assert(document.querySelector('#studio-content').hidden, 'Editor Studio Anak tetap tersembunyi');
+        assert(document.querySelector('.history-nav').classList.contains('active'), 'Sidebar tetap di Riwayat');
+        assert(!document.querySelector('#results').hidden, 'Hasil klip terlihat');
+        assert(document.querySelector('#result-title').textContent === job.title, 'Judul hasil cocok dengan pilihan');
+        location.hash = '';
+        await new Promise(resolve => setTimeout(resolve, 50));
+        assert(document.querySelector('#results').hidden, 'Hasil riwayat tidak tampil di Studio Anak');
+        """
+        self._run_chrome_test(script, window_size="375,667")
+
     def test_browser_catalog_category_filters(self):
         """Memastikan filter kategori bekerja dinamis pada kartu ide di DOM."""
         js = """
