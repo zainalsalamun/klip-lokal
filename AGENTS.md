@@ -14,6 +14,7 @@ Berlaku untuk seluruh repository Klip lokal. Baca file ini sebelum mengubah kode
 | Berkas | Tanggung jawab |
 | --- | --- |
 | `app.py` | Flask, validasi API, worker video, metadata/history, ASS, ekspor |
+| `media_quality.py` | Pemilihan sumber YouTube, probe sumber, kualitas dan encoder bersama |
 | `kids_content.py`, `clip_exports.py` | Brief Studio Anak dan ekspor turunan klip MP4/PNG |
 | `global_content.py` | Topik dan ide editorial Studio Global |
 | `speaker_crop.py` | Perkiraan pembicara dari wajah/gerakan mulut dan audio |

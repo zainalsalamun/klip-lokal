@@ -124,3 +124,8 @@ Caption baru dirangkum oleh AI lokal dari pembahasan tiap klip, bukan potongan a
 ### Studio Anak dan ekspor klip
 
 Buka `/kids`, simpan brief lalu **Gunakan video sendiri** untuk kandidat berbahasa Indonesia usia3–5. Job menyimpan salinan brief; hasil tetap perlu ditinjau kreator dewasa. Kartu hasil menyediakan editor caption/watermark, **Ekspor MP4 watermark**, serta thumbnail PNG dari frame klip (9:16/16:9). Hasil baru tidak menimpa file awal. Trim/subtitle manual dan editor desain thumbnail penuh belum tersedia. Lihat [panduan penggunaan](docs/USAGE.md).
+
+
+### Crop halus dan kualitas sumber
+
+Pemrosesan baru memakai posisi crop per-frame dengan deteksi pembicara tetap ringan. Target kualitas YouTube1080/1440/2160p terpisah dari ukuran ekspor; video/audio dapat diunduh terpisah dan digabung FFmpeg. Resolusi sumber aktual serta peringatan pembesaran ditampilkan. Hasil lama tidak diubah otomatis. Lihat [analisis dan perbaikan](docs/reviews/CROP_QUALITY_FIX.md).

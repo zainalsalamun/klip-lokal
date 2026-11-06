@@ -68,3 +68,6 @@ K2/K3: `test_kids_pipeline_exports.py` memakai direktori sementara untuk mode/ba
 
 
 Smoke live K2/K3: lihat [hasil dan batas](reviews/KIDS_K2_K3_SMOKE_TEST.md). Launcher `tests/serve_kids_smoke.py --data outputs/kids-smoke/live` memakai fixture sintetis terpisah dan tidak mengunduh model. Tambahkan `runtime/node_modules/node/bin/node tests/test_kids_source_history.cjs` untuk regresi prefill history berbeda agar bahasa/form Studio Anak tetap mengikuti brief. Uji browser nyata tetap diperlukan; VM hanya membuktikan aturan prefill.
+
+
+`test_media_quality.py`: selector yt-dlp asli secara offline memilih stream HD terpisah dibanding combined360p; download+merge nyata via HTTP loopback dan FFmpeg bawaan; metadata/upscale dan validasi API; trajectory per-frame/CFR/VFR/time bounds/cut reset; serta render piksel nyata dengan phase correlation untuk memastikan posisi perantara muncul. Pengujian download lokal ini tidak membuktikan ketersediaan/akses format pada setiap URL YouTube.

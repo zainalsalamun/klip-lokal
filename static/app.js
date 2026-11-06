@@ -1093,6 +1093,16 @@ function clipOutputTools(clip, job) {
 }
 
 function render(job) {
+  let sourceSummary = document.querySelector('#source-quality-summary');
+  if (!sourceSummary) {
+    sourceSummary = document.createElement('p'); sourceSummary.id = 'source-quality-summary';
+    document.querySelector('#results .results-head').append(sourceSummary);
+  }
+  sourceSummary.hidden = !job.source_media;
+  if (job.source_media) {
+    const media = job.source_media;
+    sourceSummary.textContent = 'Sumber aktual: ' + media.width + ' × ' + media.height + (media.fps ? ' · ' + media.fps + ' fps' : '') + '. Resolusi hasil adalah ukuran ekspor; detail mengikuti sumber.';
+  }
   const resultsNote = document.querySelector('#results-note') || document.querySelector('#results .results-head p');
   if (resultsNote) resultsNote.textContent = job.content_profile === 'kids' ? 'Kandidat untuk ditinjau · Anak 3–5 · Indonesia. Tujuan brief: ' + (job.kids_metadata?.brief_snapshot?.learning_goal || 'Tinjau konsep pembelajaran') + '. Label ini bukan sertifikasi kesesuaian usia.' : job.audience === 'global_en' ? 'Subtitle dan caption: English · suara asli dipertahankan. Tinjau terjemahan dan konteks sebelum posting.' : 'Pilihan berdasarkan transkrip, bukan jaminan viral. Tinjau framing dan batas ucapan sebelum posting.';
   document.querySelector('#results').hidden = location.hash === '#history' || !job.clips?.length;
@@ -1107,7 +1117,11 @@ function render(job) {
     const text = document.createElement('p'); text.textContent = c.text;
     const download = document.createElement('a'); download.className = 'download'; download.href = c.url + '?download=1'; download.textContent = 'Unduh MP4 ↓';
     const framing = document.createElement('small'); framing.className = 'framing-note'; framing.textContent = c.framing?.note || 'Hasil lama · crop tengah';
-    card.append(video, heading, time, framing, text, download, captionEditor(c, i, job.id, job.audience), watermarkEditor(c, i, job.id), clipOutputTools(c, job)); grid.append(card);
+    const quality = document.createElement('p'); quality.className = 'quality-note';
+    const qualityInfo = c.quality || c.framing?.quality;
+    quality.hidden = !qualityInfo?.warning;
+    quality.textContent = qualityInfo?.warning || '';
+    card.append(video, heading, time, framing, quality, text, download, captionEditor(c, i, job.id, job.audience), watermarkEditor(c, i, job.id), clipOutputTools(c, job)); grid.append(card);
   });
 }
 function display(job) {
@@ -1286,6 +1300,7 @@ async function openJob(id) {
         else if (job[key] != null) form.elements[key].value = job[key];
       }
       form.elements.resolution.value = job.resolution || '720';
+      if (form.elements.source_quality) form.elements.source_quality.value = job.source_quality || '1080';
       form.elements.subtitle_style.value = job.subtitle_style || 'classic';
       if (form.elements.topic) form.elements.topic.value = job.topic || 'general';
       syncFormat();
@@ -1370,10 +1385,9 @@ if (form) {
     if (progEl) progEl.hidden = false;
     if (statusEl) statusEl.textContent = 'Mengirim video…';
     try {
-      if (form.elements.audience?.value === 'global_en') {
-        const health = await api('/api/health');
-        if (!health.capabilities?.includes('global_en')) throw Error('Studio Global memerlukan server versi baru. Setelah video aktif selesai, restart server lalu coba lagi.');
-      }
+      const health = await api('/api/health');
+      if (!health.capabilities?.includes('source_quality') || !health.capabilities?.includes('smooth_crop')) throw Error('Perbaikan crop dan sumber HD memerlukan restart server. Setelah pekerjaan aktif selesai, hentikan aplikasi dengan Ctrl+C lalu jalankan npm run dev kembali.');
+      if (form.elements.audience?.value === 'global_en' && !health.capabilities?.includes('global_en')) throw Error('Studio Global memerlukan server versi baru. Setelah video aktif selesai, restart server lalu coba lagi.');
       const result = await api('/api/jobs', {method:'POST', body:new FormData(form)});
       clearTimeout(timer); ++selectionVersion;
       activeJobId = selectedJobId = result.id; remember(result.id);

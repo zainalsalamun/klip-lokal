@@ -242,3 +242,7 @@ main{margin-left:230px;padding:0 40px;max-width:1500px}
 
 /* Kelip Studio: the star in k✳lip. represents E. */
 .brand{display:inline-block}.brand>small{display:block;font:600 9px/1.5 'DM Sans',Arial,sans-serif;letter-spacing:3px;margin:4px 0 0 3px;color:#71862e}
+
+.source-quality-field{grid-column:1/-1!important}.source-quality-field small{display:block;font-size:10px;color:var(--muted);line-height:1.6;margin-top:7px}
+.clip .quality-note{display:block;-webkit-line-clamp:unset;background:#fff8e8;border:1px solid #ebd8ac;color:#805d21;padding:10px;border-radius:6px;overflow:visible;font-size:11px;line-height:1.7}
+#source-quality-summary{padding:10px 12px;background:#eef3e8;border-radius:6px;font-size:12px;line-height:1.7;color:#50613e}

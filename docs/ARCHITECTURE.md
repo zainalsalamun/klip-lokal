@@ -27,11 +27,11 @@ Browser → GET /files/<id>/clip-N.mp4
 ## Pipeline
 
 1. Validasi URL, parameter dan ketersediaan worker. Buat direktori `data/<uuid>/`.
-2. Unduh format gabungan terbaik hingga tinggi 1080, mendahulukan MP4; atau simpan unggahan. Pemilihan ini tidak selalu memperoleh resolusi tertinggi yang tersedia lewat stream video/audio terpisah.
+2. Unduh video-only hingga target sumber1080/1440/2160 dan audio terbaik, lalu merge melalui FFmpeg bawaan; fallback format gabungan bila diperlukan. Dimensi/FPS/codec sumber aktual dicatat; target tidak menjamin semua resolusi tersedia. Unggahan lokal memakai file aslinya.
 3. Ekstrak audio mono WAV 16 kHz dengan FFmpeg yang dipaketkan imageio-ffmpeg.
 4. Muat Whisper `base` sekali per proses server. Jalankan CPU `int8`, `vad_filter=True`, `beam_size=3`; simpan transkrip segmen.
 5. Pilih jendela kandidat, beri skor, lalu ambil kandidat skor tertinggi yang tidak saling beririsan.
-6. Tulis ASS dan render setiap klip secara berurutan. Skala hingga menutup resolusi terpilih (480×854, 720×1280, atau 1080×1920) lalu crop yang mengikuti perkiraan pembicara (`speaker_crop.py`: Haar face detector OpenCV, gerakan area mulut dikurangi gerakan atas wajah, gerbang RMS audio, hysteresis dan smoothing). FFmpeg `sendcmd` mengubah posisi crop sepanjang klip. Jika deteksi tidak menghasilkan wajah atau analisis gagal, fallback crop tengah dengan catatan framing. Selanjutnya `setsar=1`, bakar subtitle, enkode H.264 (`veryfast`, CRF 23) dan AAC. `+faststart` membantu pemutaran MP4.
+6. Tulis ASS dan render setiap klip secara berurutan. Skala hingga menutup resolusi terpilih (480×854, 720×1280, atau 1080×1920) lalu crop yang mengikuti perkiraan pembicara (`speaker_crop.py`: Haar face detector OpenCV, gerakan area mulut dikurangi gerakan atas wajah, gerbang RMS audio, hysteresis dan smoothing). Analisis wajah sekitar4Hz dipisahkan dari trajectory kamera. Target diinterpolasi dan dihaluskan dengan batas kecepatan/akselerasi serta dead-zone berbasis waktu; sendcmd dibuat per-frame dari PTS decode. Perubahan scene besar pada sampel dapat mereset trajectory sebagai heuristik. Jika deteksi tidak menghasilkan wajah atau analisis gagal, fallback crop tengah dengan catatan framing. Selanjutnya `setsar=1`, bakar subtitle, enkode H.264 (`fast`, CRF18, scaling Lanczos) dan AAC. `+faststart` membantu pemutaran MP4.
 7. Tulis status akhir beserta daftar hasil.
 
 ## Skor kandidat

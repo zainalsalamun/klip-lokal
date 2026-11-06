@@ -397,3 +397,12 @@ Form baru: `content_profile=general|kids` (defaultgeneral). Kids wajib `audience
 202: `{export:{export_id,kind,status:running,settings,created_at,...}}`. Request ID sama dengan intent sama mengembalikan record existing200 tanpa render ganda; intent berbeda409. Revisi usang atau media/AI sedang aktif409; payload invalid400, file hilang404.
 
 `GET .../exports/<export_id>` memberi statusrunning/done/failed. Setelah restart, recordrunning tanpa worker aktif dilaporkanfailed/interrupted. `GET .../exports/<export_id>/file?download=1` mengunduh hasil bila done; belum selesai409. MP4 dan PNG disimpan terpisah di job/exports/id; file awal tidak ditimpa dan watermark_revision/caption_revision tidak dinaikkan oleh ekspor. MP4 menggunakan audio streamcopy dari klip, subtitle awal tetap terbakar. Health `active_exports` dan `active_jobs` mencakup pekerjaan ekspor untuk melindungi launcher stop.
+
+
+## Kualitas sumber dan per-frame crop
+
+POST `/api/jobs` menerima form `source_quality=1080|1440|2160` (default1080); nilai lain400. Field mengatur batas tinggi sumber YouTube, bukan ukuran output `resolution`, dan disimpan pada job/history. Worker mengunduh bestvideo+bestaudio dengan fallback combined serta merge memakai executable FFmpeg bawaan. Format yang terpilih mungkin lebih rendah dari target.
+
+Job baru menyimpan `source_media={width,height,fps,codec,bitrate}` bila dapat dibaca. Setiap klip mempunyai `quality={source_known,source_width,source_height,output_width,output_height,upscale_factor,effective_crop_width,effective_crop_height,warning}` dan framing/encoder metadata. Data lama boleh tidak mempunyai field ini. Warning bukan estimasi ketajaman berbasis AI.
+
+Health capabilities `source_quality` dan `smooth_crop` menandai backend baru. Frontend menolak memulai job terhadap backend lama dan meminta restart setelah pekerjaan aktif selesai, agar source HD/crop halus tidak tampak aktif padahal worker masih versi lama.

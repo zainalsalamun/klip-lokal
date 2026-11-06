@@ -12,6 +12,7 @@ from local_caption import summarize, CaptionUnavailable, UnclearTranscript, infe
 import watermark
 import kids_content
 import clip_exports
+from media_quality import download_options, downloaded_path, probe_media, output_quality, SOURCE_HEIGHTS, ENCODER_PRESET, ENCODER_CRF, SCALE_FLAGS
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
@@ -226,7 +227,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 def render_clip(source, ass, out, start, end, resolution="720"):
     width, height = RESOLUTIONS[resolution]
-    vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1,subtitles=" + ass.name
+    vf = f"scale={width}:{height}:force_original_aspect_ratio=increase:force_divisible_by=2:flags={SCALE_FLAGS},crop={width}:{height},setsar=1,subtitles=" + ass.name
     framing = {"mode":"center", "note":"Wajah tidak terdeteksi; crop tengah digunakan."}
     audio = ass.parent / "audio.wav"
     if audio.exists():
@@ -235,15 +236,17 @@ def render_clip(source, ass, out, start, end, resolution="720"):
             points, detected = crop_plan(source, audio, start, end, width, height)
             if points:
                 commands = ass.with_suffix('.crop.txt')
-                commands.write_text("\n".join(f"{time:.3f} crop x {x};" for time,x in points))
+                commands.write_text("\n".join(f"{time:.6f} crop x {x};" for time,x in points))
                 vf = f"sendcmd=f={commands.name}," + vf
-                framing = {"mode":"speaker_estimate", "note":"Crop mengikuti perkiraan pembicara dari wajah dan gerakan mulut; tinjau sebelum posting.", "face_samples":detected}
+                framing = {"mode":"speaker_estimate", "note":"Crop mengikuti perkiraan pembicara dari wajah dan gerakan mulut; tinjau sebelum posting.", "face_samples":detected, "camera_motion":"per_frame_damped", "crop_commands":len(points)}
         except Exception as exc:
             framing = {"mode":"center", "note":"Pelacakan tidak tersedia; crop tengah digunakan.", "detail":str(exc)}
+    framing["quality"] = output_quality(probe_media(source), width, height)
+    framing["encoder"] = {"preset":ENCODER_PRESET, "crf":int(ENCODER_CRF), "scale":SCALE_FLAGS}
     ass.with_suffix('.framing.json').write_text(json.dumps(framing, ensure_ascii=False))
     result = subprocess.run([FFMPEG, "-hide_banner", "-y", "-ss", str(start), "-i", str(source.resolve()),
-                             "-t", str(end-start), "-vf", vf, "-c:v", "libx264", "-preset", "veryfast",
-                             "-crf", "23", "-c:a", "aac", "-movflags", "+faststart", str(out.resolve())],
+                             "-t", str(end-start), "-vf", vf, "-c:v", "libx264", "-preset", ENCODER_PRESET,
+                             "-crf", ENCODER_CRF, "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", str(out.resolve())],
                             cwd=ass.parent, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError("Ekspor gagal: " + result.stderr[-1200:])
@@ -257,7 +260,7 @@ def kids_caption(result):
     return result
 
 
-def process(jid, url, local, duration, count, lang, resolution="720", audience="local", topic="general", subtitle_style="classic"):
+def process(jid, url, local, duration, count, lang, resolution="720", audience="local", topic="general", subtitle_style="classic", source_quality="1080"):
     try:
         folder=DATA/jid
         source=local
@@ -265,9 +268,14 @@ def process(jid, url, local, duration, count, lang, resolution="720", audience="
         if url:
             update(jid,status="Mengunduh video YouTube…",progress=8)
             import yt_dlp
-            with yt_dlp.YoutubeDL({"js_runtimes":{"node":{"path":str(ROOT/"runtime/node_modules/node/bin/node")}}, "format":"best[height<=1080][ext=mp4]/best[height<=1080]", "outtmpl":str(folder/"source.%(ext)s"),"noplaylist":True,"quiet":True,"socket_timeout":30,"retries":2,"max_filesize":2*1024**3}) as ydl:
+            options = download_options(folder, FFMPEG, ROOT/"runtime/node_modules/node/bin/node", source_quality)
+            with yt_dlp.YoutubeDL(options) as ydl:
                 info=ydl.extract_info(url,download=True)
-                source=Path(ydl.prepare_filename(info)); title=info.get("title",title)
+                source=downloaded_path(ydl, info, folder); title=info.get("title",title)
+            if source.stat().st_size > 2*1024**3:
+                raise RuntimeError("Sumber gabungan melebihi 2 GB. Pilih kualitas sumber lebih rendah.")
+        source_media = probe_media(source)
+        update(jid, source_media=source_media)
         update(jid,title=title,status="Menyiapkan audio…",progress=25)
         audio=folder/"audio.wav"
         run(["-i",source,"-vn","-ac","1","-ar","16000",audio])
@@ -301,6 +309,7 @@ def process(jid, url, local, duration, count, lang, resolution="720", audience="
             clip_id = uuid.uuid5(KLIP_NAMESPACE, f"{jid}:{round(float(c['start']), 3)}").hex
             clips.append({**c,"clip_id":clip_id,"metadata_revision":1,"file":out.name,"url":f"/files/{jid}/{out.name}",
                           "subtitle_style":subtitle_style,"framing":framing,"resolution":resolution,"width":width,"height":height,
+                          "quality":output_quality(source_media, width, height),
                           "caption":make_caption(c["text"],audience),"caption_source":"extractive",
                           "caption_language":"id" if audience == "local" else "en",
                           "caption_updated_at":now_iso,"audience":audience})
@@ -334,7 +343,7 @@ def too_large(error):
 def health():
     with lock:
         active = sum(not job.get("done") for job in jobs.values())
-    return jsonify(app="klip-lokal", status="ok", active_jobs=active + int(active_export is not None), active_exports=int(active_export is not None), active_caption=inference_lock.locked() or bool(caption_requests), capabilities=["history_delete", "history_pagination", "global_en", "local_caption_ai", "caption_persistence", "watermark", "kids_studio", "kids_pipeline", "clip_exports"])
+    return jsonify(app="klip-lokal", status="ok", active_jobs=active + int(active_export is not None), active_exports=int(active_export is not None), active_caption=inference_lock.locked() or bool(caption_requests), capabilities=["history_delete", "history_pagination", "global_en", "local_caption_ai", "caption_persistence", "watermark", "kids_studio", "kids_pipeline", "clip_exports", "smooth_crop", "source_quality"])
 
 @app.get("/favicon.ico")
 def favicon(): return redirect("/static/favicon.svg", code=302)
@@ -547,6 +556,8 @@ def create():
         duration=int(request.form.get("duration",30)); count=int(request.form.get("count",3))
         if duration not in (15,30,45,60) or count not in (1,3,5): raise ValueError()
         resolution=request.form.get("resolution", "720")
+        source_quality=request.form.get("source_quality", "1080")
+        if source_quality not in SOURCE_HEIGHTS: raise ValueError()
         if resolution not in RESOLUTIONS: raise ValueError()
         subtitle_style=request.form.get("subtitle_style", "classic")
         if subtitle_style not in SUBTITLE_STYLES: raise ValueError()
@@ -587,6 +598,7 @@ def create():
         jobs[jid]=dict(id=jid, schema_version=2, title="Video YouTube" if url else original_name,
                        source_url=url or None, source_name=original_name if not url else None,
                        content_profile=content_profile, kids_metadata=kids_metadata,
+                       source_quality=source_quality,
                        duration=duration, count=count, language=lang, resolution=resolution, audience=audience, topic=topic, subtitle_style=subtitle_style,
                        created_at=now, updated_at=now,
                        status="Dalam antrean…",progress=0,done=False,clips=[])
@@ -598,7 +610,7 @@ def create():
         except Exception:
             update(jid,done=True,status="Gagal",error="File tidak dapat disimpan. Periksa ruang disk.")
             return jsonify(error="File tidak dapat disimpan. Periksa ruang disk."),400
-    threading.Thread(target=process,args=(jid,url,local,duration,count,lang,resolution,audience,topic),kwargs={"subtitle_style":subtitle_style},daemon=True).start()
+    threading.Thread(target=process,args=(jid,url,local,duration,count,lang,resolution,audience,topic),kwargs={"subtitle_style":subtitle_style,"source_quality":source_quality},daemon=True).start()
     return jsonify(id=jid),202
 
 def job_summary(folder):
@@ -620,7 +632,7 @@ def job_summary(folder):
         return None
     summary = {key: job.get(key) for key in (
         "id", "title", "created_at", "updated_at", "status", "progress", "done",
-        "source_url", "source_name", "content_profile", "kids_metadata", "duration", "count", "language", "resolution", "audience", "topic", "subtitle_style", "error")}
+        "source_url", "source_name", "source_quality", "source_media", "content_profile", "kids_metadata", "duration", "count", "language", "resolution", "audience", "topic", "subtitle_style", "error")}
     summary.pop("kids_metadata", None)
     summary["clip_count"] = len(job.get("clips", []))
     with lock:

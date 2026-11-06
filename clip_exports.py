@@ -4,8 +4,7 @@ import subprocess
 import cv2
 import numpy as np
 import watermark
-ENCODER_PRESET = "fast"
-ENCODER_CRF = "18"
+from media_quality import ENCODER_PRESET, ENCODER_CRF
 
 
 def render_export(ffmpeg, source, destination, config, assets_dir, *, kind, frame_time=0, ratio='vertical'):

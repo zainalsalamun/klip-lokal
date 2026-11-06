@@ -51,3 +51,5 @@ Bukti pengujian live: [Smoke test Studio Anak K2/K3](reviews/KIDS_K2_K3_SMOKE_TE
 Identitas produk dan arah lokal: [Kelip Studio](BRANDING.md).
 
 Analisis media: [Crop bertangga dan kualitas HD](reviews/CROP_QUALITY_ANALYSIS.md).
+
+Implementasi kualitas video: [Crop per-frame dan sumber HD](reviews/CROP_QUALITY_FIX.md).

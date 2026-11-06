@@ -92,7 +92,7 @@ Durasi 15/30/45/60 detik adalah target. Kandidat memakai segmen transkrip utuh d
 
 ### Crop mengikuti perkiraan pembicara
 
-OpenCV mendeteksi wajah pada sampel video sekitar 4 kali/detik. Gerakan area mulut dibandingkan area atas wajah dan tingkat audio digunakan sebagai perkiraan aktivitas bicara. Perpindahan menunggu aktivitas yang berkelanjutan dan kamera bergerak bertahap agar tidak meloncat pada tiap frame. Bila tidak ada wajah, posisi terakhir ditahan; bila tidak pernah ada wajah, crop tengah digunakan. Catatan mode framing muncul di bawah hasil klip, termasuk fallback jika analisis gagal.
+OpenCV mendeteksi wajah pada sampel video sekitar 4 kali/detik. Gerakan area mulut dibandingkan area atas wajah dan tingkat audio digunakan sebagai perkiraan aktivitas bicara. Perpindahan menunggu aktivitas berkelanjutan; posisi kamera dihitung pada setiap frame dengan interpolasi, redaman serta batas kecepatan/akselerasi, bukan hanya saat deteksi wajah diperbarui. Bila tidak ada wajah, posisi terakhir ditahan; bila tidak pernah ada wajah, crop tengah digunakan. Catatan mode framing muncul di bawah hasil klip, termasuk fallback jika analisis gagal.
 
 Ini heuristik visual dengan gerbang audio, bukan diarization atau model sinkronisasi bibir. Gerakan kepala, tertawa, wajah menyamping, shot berpindah, musik, dan pembicara bersamaan dapat membuat pilihan keliru. Tidak mengenali identitas atau memisahkan suara tiap orang. Selalu tinjau hasil; hasil lama tetap memakai framing sebelumnya. Analisis tambahan membuat proses lebih lama. Data analisis dan command crop disimpan di folder pekerjaan dan ikut terhapus lewat Hapus riwayat.
 
@@ -148,3 +148,12 @@ Untuk gambar, pilih waktu frame dalam detik relatif terhadap klip dan rasio9:16 
 Satu pemrosesan media aktif pada satu waktu. Jangan menutup server saat ekspor. Ekspor yang terputus ditampilkan gagal; buat ekspor baru. Hasil ekspor menambah penggunaan disk dan ikut terhapus ketika riwayat tersebut dihapus. Tidak ada upload/ubah audience YouTube otomatis.
 
 Membuka riwayat pekerjaan lain dari form sumber Studio Anak tidak mengubah pilihan video/bahasa brief yang sedang disiapkan. Prefill pengaturan hanya dilakukan untuk pekerjaan kids dari brief yang sama.
+
+
+## Kualitas sumber dan crop halus
+
+**Target sumber YouTube** terpisah dari **Resolusi hasil**. Pilih hingga1080p (default, lebih ringan),1440p, atau2160p/4K (lebih besar/lambat). Aplikasi mengunduh video dan audio terpisah lalu menggabungkannya bila tersedia. Target bukan jaminan resolusi tersedia; sumber gabungan melebihi2GB ditolak dan perlu target lebih rendah. Pilihan ini tidak mengubah file upload lokal.
+
+Hasil baru menampilkan resolusi/FPS sumber aktual dan peringatan upscale jika pembesaran lebih dari5%. Contoh sumber640×360 yang diekspor1080×1920 tetap tidak mempunyai detail1080p asli. Untuk crop portrait dari sumber landscape, bahkan sumber1080p dapat memerlukan pembesaran. Hasil lama tidak diunduh/dirender ulang otomatis.
+
+Crop baru memakai trajectory per-frame; analisis pembicara tetap heuristik4Hz. Encoding baru memakai Lanczos dan H.264fast/CRF18 untuk menjaga detail, dengan kemungkinan file lebih besar/waktu render lebih lama. Ekspor watermark mengikuti pengaturan kualitas ini. Sesudah memperbarui source, restart server ketika idle lalu refresh browser sebelum memulai pekerjaan baru.
