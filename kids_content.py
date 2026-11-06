@@ -440,7 +440,7 @@ def format_brief_txt(brief: Dict[str, Any]) -> str:
     lines = [
         "=" * 80,
         "BRIEF PRODUKSI KONTEN ANAK (3–5 TAHUN · BAHASA INDONESIA)",
-        "Klip Lokal — Studio Anak",
+        "Kelip Studio — Studio Anak",
         "=" * 80,
         f"Judul Kerja      : {title}",
         f"Target Usia      : 3–5 tahun",

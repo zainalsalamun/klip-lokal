@@ -229,3 +229,13 @@ main{margin-left:230px;padding:0 40px;max-width:1500px}
   .brief-actions-left,.brief-actions-right{width:100%}
   .brief-actions-left button,.brief-actions-right button{flex:1;text-align:center}
 }
+
+/* Saved brief to source, and derived clip outputs. */
+.kids-source-note{padding:20px;margin-bottom:20px;background:#f2f7e8;border:1px solid #dce6cc;border-radius:10px}
+.kids-source-note h2{font-size:20px;margin:12px 0}.kids-source-note p{font-size:12px;line-height:1.7}
+.clip-output-tools{margin-top:18px;padding:16px;border:1px solid #dde5d3;border-radius:10px;background:#fafcf7}
+.clip-output-tools h3{font-size:15px}.clip-output-tools p{font-size:11px;line-height:1.7}
+.clip-output-tools label{display:block;font-size:11px;margin-top:12px}.clip-output-tools input,.clip-output-tools select{width:100%;box-sizing:border-box;margin-top:5px;padding:9px;border:1px solid #d8dfd0;border-radius:6px;background:white}
+.clip-output-tools button{width:auto;margin:0;padding:10px;font-size:11px}.clip-output-tools button:disabled{opacity:.55;cursor:wait}
+.clip-export-list{display:flex;flex-direction:column;gap:12px;overflow-wrap:anywhere;font-size:11px;line-height:1.7}.clip-export-list img{display:block;max-width:100%;max-height:230px;object-fit:contain;margin-top:8px}
+.brief-heading-actions{flex-wrap:wrap}.brief-heading-actions button{width:auto;font-size:11px;margin:0;padding:10px}.brief-heading-actions button:disabled{opacity:.5;cursor:not-allowed}

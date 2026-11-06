@@ -33,3 +33,8 @@ Jinja, JavaScript biasa dan CSS melayani kedua studio. Select asli tetap menjadi
 ## Mengubah keputusan
 
 Jelaskan masalah, alternatif, dampak data/history, privasi, kebutuhan sumber daya dan strategi verifikasi pada PR. Perbarui dokumen ini serta API/SETUP/ARCHITECTURE yang relevan setelah perubahan benar-benar diterapkan. Jangan menulis rencana sebagai fitur tersedia.
+
+
+## Ekspor turunan K3 sebelum editor M2 penuh
+
+K3 menggunakan klip MP4 yang sudah tersedia sebagai input immutable untuk watermark dan frame thumbnail. Ini memungkinkan hasil nyata tanpa membangun editor timeline kedua. Caption tetap terpisah dari subtitle terbakar. Versi ekspor disimpan berdampingan dan tidak menjadi active clip baru; rancangan M3 penuh tetap memerlukan implementasi editor draft/render-version yang berbeda. Reservation satu media job menjaga laptop8GB dari render berat paralel.

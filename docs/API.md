@@ -384,3 +384,16 @@ Respons 200: Mengembalikan isi file dengan header `Content-Disposition: attachme
 ### Validasi ketat brief Studio Anak
 
 POST/PATCH `/api/kids/briefs` dibatasi32KiB (413 bila berlebih). Durasi harus JSON integer15/30/45/60; float, boolean dan string angka ditolak400. Kategori harus enum katalog; `age_band`/`language` jika dikirim wajib `3_5`/`id`. `idea_id` opsional null atau ID katalog. `brief_id`, `revision`, `created_at`, `updated_at` dikelola server; gunakan `expected_revision` integer positif non-boolean pada PATCH. Default hanya untuk field yang tidak dikirim; nilai enum salah tidak diganti diam-diam.
+
+
+## Profil kids pada POST /api/jobs
+
+Form baru: `content_profile=general|kids` (defaultgeneral). Kids wajib `audience=local`, `language=id`, `brief_id` yang ada, dan `brief_revision` sesuai revisi terakhir. `source_kind=speech` (default) atau `music` (ditolak400 karena belum didukung). Brief invalid400, hilang404, revisi usang409. Simpan `kids_metadata={age_band:3_5,language:id,brief_id,brief_snapshot}`; job lama defaultgeneral/null. Ringkasan history hanya menyertakan `content_profile`, bukan seluruh brief. Route `/kids/source?brief=<id>` menyiapkan form dari brief tersimpan.
+
+## Ekspor turunan per klip
+
+`POST /api/jobs/<jid>/clips/<clip_id>/exports` menerima JSON `request_id` hex32 unik, `kind=video|thumbnail`, `expected_watermark_revision` integer positif, `frame_time` detik relatif klip (default0), `ratio=vertical|landscape` (defaultvertical, untuk thumbnail). `video` membutuhkan watermark aktif tersimpan. Snapshot dari server, bukan konfigurasi client.
+
+202: `{export:{export_id,kind,status:running,settings,created_at,...}}`. Request ID sama dengan intent sama mengembalikan record existing200 tanpa render ganda; intent berbeda409. Revisi usang atau media/AI sedang aktif409; payload invalid400, file hilang404.
+
+`GET .../exports/<export_id>` memberi statusrunning/done/failed. Setelah restart, recordrunning tanpa worker aktif dilaporkanfailed/interrupted. `GET .../exports/<export_id>/file?download=1` mengunduh hasil bila done; belum selesai409. MP4 dan PNG disimpan terpisah di job/exports/id; file awal tidak ditimpa dan watermark_revision/caption_revision tidak dinaikkan oleh ekspor. MP4 menggunakan audio streamcopy dari klip, subtitle awal tetap terbakar. Health `active_exports` dan `active_jobs` mencakup pekerjaan ekspor untuk melindungi launcher stop.

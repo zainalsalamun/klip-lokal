@@ -183,3 +183,8 @@ Bahasa caption ditentukan oleh audience: lokal Indonesia, Global Inggris. `langd
 5. **Pengujian**:
    - `tests/test_kids_studio.py`: Pengujian unit dan integrasi API (11 tes) mencakup validasi batas karakter, atomisitas simpan/baca/hapus, OCC 409, dan isolasi dari scanner history.
    - `tests/test_browser_kids_studio.py`: Pengujian antarmuka Chrome Headless nyata (4 tes) membuktikan tidak adanya exception null-form, fungsi filter kategori ide, penanganan konflik 409, dan responsivitas layar sempit 375×667.
+
+
+## K2/K3 dan ekspor turunan
+
+Form `/kids/source` dan POST job memakai profil orthogonal audience serta snapshot brief. `clip_exports.py` mengekspor dari MP4 awal dengan watermark snapshot dan frame PNG. Endpoint ekspor async berada di app.py; reservation media dan status metadata di bawah RLock, idempotensi request ID wajib. UI clipOutputTools mem-poll status tanpa merender ulang editor yang mempunyai draft. Renderer trim/subtitle M2 dan editor judul/template thumbnail belum tersedia.

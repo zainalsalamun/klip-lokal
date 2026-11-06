@@ -12,6 +12,7 @@ Panduan memilih alur kerja untuk developer dan coding agent Klip lokal. Baca [AG
 | Crop mengikuti pembicara | `speaker_crop.py`, `render_clip()` | `test_speech_cuts.py`, `test_resolution.py`, video multipembicara dan fallback |
 | Tampilan subtitle/resolusi | `subtitle_styles.py`, `write_subs()`, template dan JS | `test_subtitle_styles.py`, `test_resolution.py`, preview serta MP4 nyata |
 | Caption AI lokal | `local_caption.py`, endpoint caption dan editor JS | [LOCAL_AI](docs/LOCAL_AI.md), `test_local_caption.py`, contoh model nyata jika prompt berubah |
+| Studio Anak dan ekspor turunan | `kids_content.py`, `clip_exports.py`, endpoint kids/exports dan editor JS | [K2/K3](docs/reviews/KIDS_K2_K3_IMPLEMENTATION.md), `test_kids_pipeline_exports.py`, media fixture dan browser live terisolasi |
 | History, pencarian dan hapus | Route metadata di `app.py`, `static/app.js` | [API](docs/API.md), `test_history.py`, `test_history_pagination.py` |
 | Studio Global | `global_content.py`, worker dan template | [GLOBAL](docs/GLOBAL.md), `test_global_studio.py`; audio tetap asli |
 | UI dan dropdown | `templates/index.html`, `static/` | [USAGE](docs/USAGE.md), browser desktop/layar sempit dan keyboard |

@@ -131,3 +131,20 @@ Buka menu **Studio Anak** di sidebar atau navigasi ke `/kids`. Studio ini diranc
 
 
 Saat menyimpan brief Studio Anak, form dan tombol pergantian brief terkunci hingga request selesai. Kegagalan simpan mempertahankan teks agar dapat dicoba ulang. Draft belum tersimpan memicu peringatan saat keluar editor/refresh; peringatan ini bukan autosave atau penyimpanan draft browser. Simpan brief sebelum menutup aplikasi.
+
+
+## Studio Anak: dari brief ke kandidat klip
+
+Simpan atau buka brief lalu klik **Gunakan video sendiri**. Form sumber menampilkan judul/tujuan brief; bahasa Indonesia dan audience lokal terkunci. Pilih narasi/percakapan yang jelas dan rekaman sendiri atau berizin. Durasi awal mengikuti brief. Perubahan brief di sesi lain memerlukan pemuatan ulang sebelum memproses; job menyimpan snapshot sehingga perubahan brief berikutnya tidak mengubah job lama. Lagu/gerak tanpa narasi belum didukung pemilihan otomatis.
+
+Riwayat menampilkan **Anak · 3–5** dan hasil memakai label **Kandidat untuk ditinjau** beserta tujuan brief. Periksa sendiri narasi, gambar, subtitle, crop dan kesesuaian usia. Caption Indonesia dirangkum dari transkrip, bukan dari isi brief. AI tidak tersedia tidak membatalkan MP4; caption dapat ditulis dan disimpan manual.
+
+## Ekspor watermark dan thumbnail dari klip
+
+Di tiap kartu, edit caption atau simpan draft watermark. Pada **Tinjau & ekspor versi baru**, klik **Ekspor MP4 watermark** untuk membakar watermark tersimpan ke berkas MP4 baru. Audio serta subtitle yang sudah menyatu pada klip dipertahankan. Tombol Unduh MP4 awal tetap mengambil klip awal; unduh hasil watermark melalui **Unduh hasil** pada daftar ekspor.
+
+Untuk gambar, pilih waktu frame dalam detik relatif terhadap klip dan rasio9:16 (1080×1920) atau16:9 (1280×720), lalu **Buat thumbnail PNG**. Gambar memakai frame klip sebenarnya, fit dengan bidang hitam bila rasio berbeda, dan watermark tersimpan bila aktif. Belum ada editor judul/template thumbnail atau trim/subtitle manual.
+
+Satu pemrosesan media aktif pada satu waktu. Jangan menutup server saat ekspor. Ekspor yang terputus ditampilkan gagal; buat ekspor baru. Hasil ekspor menambah penggunaan disk dan ikut terhapus ketika riwayat tersebut dihapus. Tidak ada upload/ubah audience YouTube otomatis.
+
+Membuka riwayat pekerjaan lain dari form sumber Studio Anak tidak mengubah pilihan video/bahasa brief yang sedang disiapkan. Prefill pengaturan hanya dilakukan untuk pekerjaan kids dari brief yang sama.

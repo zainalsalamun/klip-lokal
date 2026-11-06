@@ -11,6 +11,7 @@ from subtitle_styles import SUBTITLE_STYLES
 from local_caption import summarize, CaptionUnavailable, UnclearTranscript, inference_lock
 import watermark
 import kids_content
+import clip_exports
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
@@ -25,15 +26,19 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024**3
 jobs = {}
 history_cache = OrderedDict()
-lock = threading.Lock()
+lock = threading.RLock()
 model_lock = threading.Lock()
 model = None
+active_export = None
+caption_requests = 0
 RESOLUTIONS = {"480": (480, 854), "720": (720, 1280), "1080": (1080, 1920)}
 KLIP_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, "klip-lokal.net")
 
 def ensure_clip_ids(job):
     jid = job.get("id") or "0" * 32
     audience = job.get("audience", "local")
+    job.setdefault("content_profile", "general")
+    job.setdefault("kids_metadata", None)
     seen = set()
     for i, clip in enumerate(job.get("clips", [])):
         cid = clip.get("clip_id")
@@ -146,7 +151,7 @@ def read_job(jid):
     return job
 
 
-def candidates(segments, duration, count, topic="general"):
+def candidates(segments, duration, count, topic="general", learning_goal=None):
     pool = []
     hooks = re.compile(r"\b(kenapa|bagaimana|rahasia|ternyata|jangan|penting|cara|kesalahan|why|how|secret|never|mistake|because|jadi|tapi)\b", re.I)
     # Prefer sentence endings or audible pauses over an exact duration cutoff.
@@ -174,6 +179,10 @@ def candidates(segments, duration, count, topic="general"):
         words = re.findall(r"\w+", text.lower())
         density = len(words) / max(1, end-start)
         score = len(hooks.findall(text))*2 + min(density, 3)*2 + len(set(words))/max(len(words),1)*3
+        if learning_goal:
+            goal_words = {w for w in re.findall(r"\w+", learning_goal.lower())
+                          if len(w) >= 4 and w not in {"mengenal", "mengenali", "belajar", "tentang", "dengan", "benda", "sekitar", "anak"}}
+            score += 3 * len(goal_words.intersection(words))
         if natural_start: score += 3
         if boundary(last): score += 3
         if re.search(r"[?!]",text): score += 1
@@ -241,6 +250,13 @@ def render_clip(source, ass, out, start, end, resolution="720"):
     return framing
 
 
+def kids_caption(result):
+    text = result.get("caption", "")
+    if re.search(r"(?i)komentar|subscribe|berlangganan|beli|alamat|nomor telepon|dijamin|pasti pintar", text):
+        raise UnclearTranscript("Caption perlu ditinjau: hindari CTA, data pribadi atau klaim hasil belajar.")
+    return result
+
+
 def process(jid, url, local, duration, count, lang, resolution="720", audience="local", topic="general", subtitle_style="classic"):
     try:
         folder=DATA/jid
@@ -265,8 +281,15 @@ def process(jid, url, local, duration, count, lang, resolution="720", audience="
             segments=[dict(start=s.start,end=s.end,text=s.text.strip()) for s in stream]
         (folder/"transcript.json").write_text(json.dumps(segments,ensure_ascii=False))
         update(jid,status="Mencari kandidat klip dari transkrip…",progress=65)
-        selected=candidates(segments,duration,count,topic)
-        if not selected: raise RuntimeError("Tidak cukup percakapan untuk membuat klip. Coba video dengan suara yang jelas.")
+        if jobs[jid].get("content_profile") == "kids":
+            goal = jobs[jid].get("kids_metadata", {}).get("brief_snapshot", {}).get("learning_goal", "")
+            selected = candidates(segments, duration, count, topic, learning_goal=goal)
+        else:
+            selected = candidates(segments, duration, count, topic)
+        if not selected:
+            if jobs[jid].get("content_profile") == "kids":
+                raise RuntimeError("Ucapan belum cukup jelas untuk kandidat anak. Lagu/gerak perlu pemilihan manual; simpan rencana brief dan gunakan sumber dengan narasi jelas.")
+            raise RuntimeError("Tidak cukup percakapan untuk membuat klip. Coba video dengan suara yang jelas.")
         clips=[]
         now_iso = datetime.now(timezone.utc).isoformat()
         for i,c in enumerate(selected):
@@ -285,6 +308,8 @@ def process(jid, url, local, duration, count, lang, resolution="720", audience="
             update(jid,status=f"AI lokal merangkum pembahasan klip {i+1}/{len(clips)}…",progress=98)
             try:
                 ai_res = summarize(clip["text"],audience)
+                if jobs[jid].get("content_profile") == "kids":
+                    ai_res = kids_caption(ai_res)
                 clip.update(ai_res)
                 clip["caption_source"] = "ai_local"
                 clip["caption_updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -301,13 +326,15 @@ def asset_version():
 
 
 @app.errorhandler(413)
-def too_large(error): return jsonify(error="File terlalu besar. Batas unggahan 2 GB."),413
+def too_large(error):
+    message = "Brief terlalu besar. Batas request 32 KiB." if request.path.startswith("/api/kids/briefs") else "File terlalu besar. Batas unggahan 2 GB."
+    return jsonify(error=message),413
 
 @app.get("/api/health")
 def health():
     with lock:
         active = sum(not job.get("done") for job in jobs.values())
-    return jsonify(app="klip-lokal", status="ok", active_jobs=active, active_caption=inference_lock.locked(), capabilities=["history_delete", "history_pagination", "global_en", "local_caption_ai", "caption_persistence", "watermark", "kids_studio"])
+    return jsonify(app="klip-lokal", status="ok", active_jobs=active + int(active_export is not None), active_exports=int(active_export is not None), active_caption=inference_lock.locked() or bool(caption_requests), capabilities=["history_delete", "history_pagination", "global_en", "local_caption_ai", "caption_persistence", "watermark", "kids_studio", "kids_pipeline", "clip_exports"])
 
 @app.get("/favicon.ico")
 def favicon(): return redirect("/static/favicon.svg", code=302)
@@ -331,6 +358,17 @@ def kids_studio():
         categories=kids_content.CATEGORIES,
         sources=kids_content.SOURCES,
     )
+
+@app.get("/kids/source")
+def kids_source():
+    brief_id = request.args.get("brief", "")
+    if not kids_content.is_valid_brief_id(brief_id):
+        return "Pilih brief tersimpan dari Studio Anak terlebih dahulu.", 400
+    with lock:
+        brief = kids_content.read_brief(KIDS_BRIEFS, brief_id)
+    if not brief:
+        return "Brief tidak ditemukan. Kembali ke Studio Anak.", 404
+    return render_template("index.html", global_mode=False, kids_mode=False, kids_source=True, selected_brief=brief)
 
 @app.get("/api/kids/ideas")
 def kids_ideas():
@@ -519,8 +557,28 @@ def create():
         if audience not in ("local", "global_en") or topic not in TOPICS: raise ValueError()
         if audience == "local": topic = "general"
     except ValueError: return jsonify(error="Pengaturan tidak valid."),400
+    content_profile = request.form.get("content_profile", "general")
+    kids_metadata = None
+    if content_profile not in ("general", "kids"):
+        return jsonify(error="Profil konten tidak valid."), 400
+    if content_profile == "kids":
+        if audience != "local" or lang != "id":
+            return jsonify(error="Studio Anak hanya mendukung audience lokal dan bahasa Indonesia (id)."), 400
+        if request.form.get("source_kind", "speech") != "speech":
+            return jsonify(error="Lagu/gerak tanpa narasi jelas belum didukung clipper. Gunakan brief sebagai rencana dan sumber dengan ucapan jelas."), 400
+        brief_id = request.form.get("brief_id", "")
+        if not kids_content.is_valid_brief_id(brief_id):
+            return jsonify(error="Pilih brief Studio Anak yang sudah disimpan."), 400
+        with lock:
+            brief = kids_content.read_brief(KIDS_BRIEFS, brief_id)
+            if brief is None:
+                return jsonify(error="Brief tidak ditemukan. Pilih ulang brief."), 404
+            if request.form.get("brief_revision") != str(brief["revision"]):
+                return jsonify(error="Brief berubah di sesi lain. Muat ulang brief sebelum membuat klip."), 409
+            kids_metadata = {"age_band":"3_5", "language":"id", "brief_id":brief_id,
+                             "brief_snapshot":copy.deepcopy(brief)}
     with lock:
-        if inference_lock.locked(): return jsonify(error="AI lokal sedang merangkum caption. Tunggu sampai selesai."),409
+        if active_export is not None or caption_requests or inference_lock.locked(): return jsonify(error="Ekspor atau AI lokal sedang berjalan. Tunggu sampai selesai."),409
         if any(not j.get("done") for j in jobs.values()): return jsonify(error="Ada video sedang diproses. Tunggu sampai selesai."),409
         jid=uuid.uuid4().hex
         folder=DATA/jid;folder.mkdir()
@@ -528,6 +586,7 @@ def create():
         original_name = Path(upload.filename.replace(chr(92), "/")).name if upload and upload.filename else None
         jobs[jid]=dict(id=jid, schema_version=2, title="Video YouTube" if url else original_name,
                        source_url=url or None, source_name=original_name if not url else None,
+                       content_profile=content_profile, kids_metadata=kids_metadata,
                        duration=duration, count=count, language=lang, resolution=resolution, audience=audience, topic=topic, subtitle_style=subtitle_style,
                        created_at=now, updated_at=now,
                        status="Dalam antrean…",progress=0,done=False,clips=[])
@@ -561,7 +620,8 @@ def job_summary(folder):
         return None
     summary = {key: job.get(key) for key in (
         "id", "title", "created_at", "updated_at", "status", "progress", "done",
-        "source_url", "source_name", "duration", "count", "language", "resolution", "audience", "topic", "subtitle_style", "error")}
+        "source_url", "source_name", "content_profile", "kids_metadata", "duration", "count", "language", "resolution", "audience", "topic", "subtitle_style", "error")}
+    summary.pop("kids_metadata", None)
     summary["clip_count"] = len(job.get("clips", []))
     with lock:
         history_cache[cache_key] = (signature, copy.deepcopy(summary))
@@ -705,6 +765,7 @@ def update_caption(jid, clip_ref):
 
 
 def _handle_generate_caption(jid, clip_ref):
+    global caption_requests
     if not re.fullmatch(r"[a-f0-9]{32}", jid):
         return jsonify(error="Riwayat tidak ditemukan."), 404
     job = read_job(jid)
@@ -750,15 +811,21 @@ def _handle_generate_caption(jid, clip_ref):
         ), 409
 
     with lock:
-        if any(not item.get("done") for item in jobs.values()):
-            return jsonify(error="Tunggu pemrosesan video selesai sebelum membuat caption AI."), 409
+        if active_export is not None or any(not item.get("done") for item in jobs.values()):
+            return jsonify(error="Tunggu pemrosesan video/ekspor selesai sebelum membuat caption AI."), 409
+        caption_requests += 1
 
     try:
         result = summarize(target_clip.get("text", ""), job.get("audience", "local"))
+        if job.get("content_profile") == "kids":
+            result = kids_caption(result)
     except UnclearTranscript as exc:
         return jsonify(error=str(exc), caption_status="needs_review"), 422
     except CaptionUnavailable as exc:
         return jsonify(error=str(exc), caption_status="unavailable"), 503
+    finally:
+        with lock:
+            caption_requests -= 1
 
     with lock:
         folder = DATA / jid
@@ -1056,6 +1123,149 @@ def update_watermark_preset(preset_id):
     return jsonify(target_preset), 200
 
 
+def find_clip(job, clip_ref):
+    return next((c for i, c in enumerate(job.get("clips", []))
+                 if c.get("clip_id") == clip_ref or str(i) == str(clip_ref)), None)
+
+
+def commit_export(jid, clip_id, record):
+    # Caller holds app lock. Never publish metadata before atomic disk write.
+    current = jobs.get(jid) or read_job(jid)
+    if not current:
+        raise ValueError("Riwayat tidak tersedia.")
+    updated = copy.deepcopy(current)
+    clip = find_clip(updated, clip_id)
+    if clip is None:
+        raise ValueError("Klip tidak tersedia.")
+    clip.setdefault("exports", {})[record["export_id"]] = record
+    write_job_atomic(jid, updated)
+    jobs[jid] = updated
+    history_cache.pop(str((DATA / jid).resolve()), None)
+
+
+def export_worker(jid, clip_id, record, source):
+    global active_export
+    folder = DATA / jid / "exports" / record["export_id"]
+    destination = folder / record["filename"]
+    try:
+        folder.mkdir(parents=True, exist_ok=False)
+        config = copy.deepcopy(record["settings"]["watermark"])
+        clip_exports.render_export(FFMPEG, source, destination, config, WATERMARK_ASSETS,
+                                   kind=record["kind"], frame_time=record["settings"]["frame_time"],
+                                   ratio=record["settings"]["ratio"])
+        record.update(status="done", finished_at=datetime.now(timezone.utc).isoformat())
+        with lock:
+            commit_export(jid, clip_id, record)
+    except Exception as exc:
+        destination.unlink(missing_ok=True)
+        record.update(status="failed", error=str(exc), finished_at=datetime.now(timezone.utc).isoformat())
+        try:
+            with lock:
+                commit_export(jid, clip_id, record)
+        except Exception:
+            pass  # GET marks an abandoned running record interrupted once the reservation ends.
+    finally:
+        with lock:
+            active_export = None
+
+
+@app.post("/api/jobs/<jid>/clips/<clip_ref>/exports")
+def create_clip_export(jid, clip_ref):
+    global active_export
+    if not re.fullmatch(r"[a-f0-9]{32}", jid):
+        return jsonify(error="Riwayat tidak ditemukan."), 404
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Payload harus JSON object."), 400
+    export_id = data.get("request_id", "")
+    if not isinstance(export_id, str) or not re.fullmatch(r"[a-f0-9]{32}", export_id):
+        return jsonify(error="request_id harus ID heksadesimal 32 karakter."), 400
+    kind = data.get("kind")
+    ratio = data.get("ratio", "vertical")
+    frame_time = data.get("frame_time", 0)
+    revision = data.get("expected_watermark_revision")
+    if kind not in ("video", "thumbnail") or ratio not in ("vertical", "landscape"):
+        return jsonify(error="Jenis ekspor atau rasio tidak valid."), 400
+    if type(frame_time) not in (int, float) or not math.isfinite(frame_time) or frame_time < 0:
+        return jsonify(error="Waktu frame harus angka positif atau nol."), 400
+    if type(revision) is not int or revision < 1:
+        return jsonify(error="Revisi watermark wajib integer positif."), 400
+    with lock:
+        if (DATA / jid).is_symlink() or (DATA / jid / "exports").is_symlink():
+            return jsonify(error="Riwayat tidak tersedia."), 404
+        job = read_job(jid)
+        if not job:
+            return jsonify(error="Riwayat tidak ditemukan."), 404
+        clip = find_clip(job, clip_ref)
+        if not clip:
+            return jsonify(error="Klip tidak ditemukan."), 404
+        previous = clip.get("exports", {}).get(export_id)
+        intent = {"kind":kind, "ratio":ratio, "frame_time":frame_time, "watermark_revision":revision}
+        if previous:
+            if previous.get("intent") != intent:
+                return jsonify(error="request_id sudah dipakai untuk pengaturan lain."), 409
+            return jsonify(export=previous), 200
+        if active_export or caption_requests or inference_lock.locked() or any(not j.get("done") for j in jobs.values()) or not job.get("done"):
+            return jsonify(error="Ada pemrosesan aktif. Tunggu selesai sebelum mengekspor."), 409
+        if revision != clip.get("watermark_revision", 1):
+            return jsonify(error="Draft watermark berubah. Muat ulang hasil sebelum ekspor."), 409
+        if not re.fullmatch(r"clip-[1-5]\.mp4", clip.get("file", "")):
+            return jsonify(error="File klip tidak tersedia."), 404
+        source = DATA / jid / clip["file"]
+        if source.is_symlink() or not source.is_file():
+            return jsonify(error="File klip tidak tersedia."), 404
+        try:
+            config = watermark.validate_watermark_config(clip.get("watermark", {}), WATERMARK_ASSETS)
+        except watermark.WatermarkError as exc:
+            return jsonify(error=str(exc)), 400
+        if kind == "video" and not config["enabled"]:
+            return jsonify(error="Aktifkan dan simpan watermark terlebih dahulu."), 400
+        record = {"export_id":export_id, "kind":kind, "status":"running", "intent":intent,
+                  "filename":"video.mp4" if kind == "video" else "thumbnail.png",
+                  "created_at":datetime.now(timezone.utc).isoformat(),
+                  "settings":{"watermark":copy.deepcopy(config), "watermark_revision":revision,
+                              "source_file":clip["file"], "ratio":ratio, "frame_time":frame_time}}
+        try:
+            commit_export(jid, clip["clip_id"], record)
+        except OSError:
+            return jsonify(error="Gagal menyimpan antrean ekspor."), 500
+        active_export = (jid, clip["clip_id"], export_id)
+        worker = threading.Thread(target=export_worker, args=(jid, clip["clip_id"], copy.deepcopy(record), source), daemon=True)
+        try:
+            worker.start()
+        except Exception as exc:
+            active_export = None
+            record.update(status="failed", error=str(exc))
+            commit_export(jid, clip["clip_id"], record)
+            return jsonify(error="Worker ekspor tidak dapat dimulai."), 500
+    return jsonify(export=record), 202
+
+
+@app.get("/api/jobs/<jid>/clips/<clip_ref>/exports/<export_id>")
+@app.get("/api/jobs/<jid>/clips/<clip_ref>/exports/<export_id>/file")
+def get_clip_export(jid, clip_ref, export_id):
+    if not re.fullmatch(r"[a-f0-9]{32}", export_id) or not re.fullmatch(r"[a-f0-9]{32}", jid):
+        return jsonify(error="Ekspor tidak ditemukan."), 404
+    with lock:
+        if (DATA / jid).is_symlink() or (DATA / jid / "exports").is_symlink():
+            return jsonify(error="Riwayat tidak tersedia."), 404
+        job = read_job(jid)
+        clip = find_clip(job, clip_ref) if job else None
+        record = copy.deepcopy(clip.get("exports", {}).get(export_id)) if clip else None
+        if not record:
+            return jsonify(error="Ekspor tidak ditemukan."), 404
+        if record["status"] == "running" and active_export != (jid, clip["clip_id"], export_id):
+            record.update(status="failed", error="Ekspor terputus. Buat ekspor baru; hasil lama tetap tersedia.")
+    if request.path.endswith("/file"):
+        if record["status"] != "done":
+            return jsonify(error="Ekspor belum selesai."), 409
+        folder = DATA / jid / "exports" / export_id
+        if folder.is_symlink() or (folder / record["filename"]).is_symlink():
+            return jsonify(error="Berkas tidak tersedia."), 404
+        return send_from_directory(folder, record["filename"], as_attachment=request.args.get("download") == "1")
+    return jsonify(export=record)
+
+
 @app.delete("/api/jobs/<jid>")
 def delete_job(jid):
     if not re.fullmatch(r"[a-f0-9]{32}", jid):
@@ -1064,7 +1274,7 @@ def delete_job(jid):
     with lock:
         if folder.is_symlink() or not folder.is_dir():
             return jsonify(error="Riwayat tidak ditemukan."), 404
-        if jid in jobs and not jobs[jid].get("done"):
+        if (active_export and active_export[0] == jid) or (jid in jobs and not jobs[jid].get("done")):
             return jsonify(error="Video masih diproses. Tunggu sampai selesai sebelum menghapus."), 409
         try:
             shutil.rmtree(folder)

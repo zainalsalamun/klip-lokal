@@ -1,6 +1,6 @@
 # PRD — Studio Anak
 
-Status: **draft usulan, belum diimplementasikan**. Versi 1.0, 5 November 2026. Target yang dipilih pengguna: kreator dewasa yang membuat konten **anak usia 3–5 tahun, bahasa Indonesia, pasar Indonesia**. Studio ini bukan aplikasi pemutar untuk anak atau sistem pemantauan tontonan anak.
+Status: **K1 dan K2 diimplementasikan; K3 terhubung ke editor caption/watermark dan ekspor turunan sederhana**. Trim/subtitle manual M2 serta editor desain thumbnail penuh belum tersedia. Versi 1.0, 5 November 2026. Target yang dipilih pengguna: kreator dewasa yang membuat konten **anak usia 3–5 tahun, bahasa Indonesia, pasar Indonesia**. Studio ini bukan aplikasi pemutar untuk anak atau sistem pemantauan tontonan anak.
 
 Dasar rekomendasi dan sumber platform: [riset konten anak](../KIDS_CONTENT_RESEARCH.md). Arah produk: ide yang dapat diproduksi dan hasil yang mudah diperiksa, bukan mengejar tontonan kompulsif atau menjanjikan video viral.
 
@@ -134,3 +134,10 @@ Gunakan rekaman/ilustrasi sintetis atau milik penguji, tidak perlu melibatkan an
 Tidak ada target views/retention yang diklaim. Ukuran awal adalah ketepatan metadata/bahasa, persistensi brief, jumlah koreksi yang diperlukan dan keberhasilan kreator menyelesaikan satu rencana serta klip yang ditinjau. Evaluasi performa publikasi menjadi pekerjaan terpisah jika pengguna meminta analytics.
 
 Rilis K1 lebih dahulu; K2/K3 diberi tugas terpisah. Pilihan usia 6–9, bahasa Inggris, pencarian tren live, narasi/lagu/animasi generatif dan sistem moderasi otomatis ditunda.
+
+
+## Implementasi K2/K3 saat ini
+
+K2: brief tersimpan membuka `/kids/source?brief=<id>`, memakai `content_profile=kids`, local/id dan snapshot brief tervalidasi. Kandidat mendapat tambahan skor kecocokan kata tujuan belajar; skor bukan validasi pembelajaran/visual. Sumber lagu/gerak tanpa narasi yang dipilih eksplisit ditolak; ucapan kosong memberi error yang dapat ditinjau. Caption membaca transkrip dan memakai pemeriksaan CTA sederhana, bukan moderasi anak menyeluruh.
+
+K3 tersedia melalui editor caption dan watermark existing serta ekspor turunan async per klip: MP4 dari klip awal dengan watermark tersimpan, cover1080×1920 atau thumbnail1280×720 PNG dari frame klip. Hasil lama tidak dipromosikan/ditimpa; tiap ekspor memiliki ID dan snapshot. Ini bagian ekspor terbatas, bukan seluruh editor/render M2/M3 atau PRD thumbnail (belum ada judul/template/ganti trim/subtitle).

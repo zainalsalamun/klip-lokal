@@ -62,3 +62,6 @@ Tes `test_delete_dialog.cjs` memakai DOM stub untuk memastikan hanya konfirmasi 
 
 
 Regresi keamanan/state K1: `test_kids_studio.py` memeriksa markup literal tersimpan, validasi tipe/enum/revisi dan batas32KiB. `tests/kids_ui_regression.js` digunakan oleh `test_browser_kids_studio.py` untuk memastikan teks menjadi textContent, deferred save mengunci form/konteks, klik ganda ditolak, kegagalan mempertahankan dirty, serta navigasi dilindungi. API pada tes UI adalah fixture; hasilnya bukan smoke test dua tab Flask live atau pemeriksaan dialog tutup-tab native.
+
+
+K2/K3: `test_kids_pipeline_exports.py` memakai direktori sementara untuk mode/bahasa, snapshot brief, route sumber, ucapan kosong, AI unavailable, busy/revisi/idempotensi dan kegagalan ekspor. Render FFmpeg nyata memeriksa MP4 watermark (piksel/dimensi/audio), PNG landscape dan hash sumber yang tetap. ASR/Ollama memakai mock; tes ini tidak membuktikan akurasi narasi/gambar atau kesesuaian usia. Browser smoke live terpisah memakai video warna/audio sinus sintetis, bukan data pengguna.

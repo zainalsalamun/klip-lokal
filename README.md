@@ -117,3 +117,8 @@ Caption baru dirangkum oleh AI lokal dari pembahasan tiap klip, bukan potongan a
 
 
 **Caption AI lokal:** pasang Ollama dan jalankan `npm run setup:ai` setelah environment Python tersedia. Model Qwen3 1.7B merangkum topik tiap klip menjadi satu kalimat; hasil lama bisa diproses lewat tombol **Buat caption AI lokal**, tanpa ekspor ulang. Lihat [setup dan batas akurasi](docs/LOCAL_AI.md).
+
+
+### Studio Anak dan ekspor klip
+
+Buka `/kids`, simpan brief lalu **Gunakan video sendiri** untuk kandidat berbahasa Indonesia usia3–5. Job menyimpan salinan brief; hasil tetap perlu ditinjau kreator dewasa. Kartu hasil menyediakan editor caption/watermark, **Ekspor MP4 watermark**, serta thumbnail PNG dari frame klip (9:16/16:9). Hasil baru tidak menimpa file awal. Trim/subtitle manual dan editor desain thumbnail penuh belum tersedia. Lihat [panduan penggunaan](docs/USAGE.md).

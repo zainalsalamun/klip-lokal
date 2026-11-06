@@ -43,3 +43,5 @@ Mulai dari [README utama](../README.md) untuk instalasi cepat dan penggunaan apl
 Perubahan UI/input memperbarui USAGE; endpoint memperbarui API; dependensi/launcher memperbarui SETUP; perilaku pipeline memperbarui ARCHITECTURE; prompt/runtime caption memperbarui LOCAL_AI. Catat bukti pemeriksaan di PR, bukan klaim bahwa semua platform/video telah diuji.
 
 Gunakan tautan relatif antarberkas. Jangan memasukkan path laptop pribadi atau isi data pengguna. Jika menambah dokumen, daftarkan di halaman ini agar mudah ditemukan.
+
+Catatan implementasi terbaru: [Studio Anak K2/K3 dan batas ekspor](reviews/KIDS_K2_K3_IMPLEMENTATION.md).
