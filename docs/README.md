@@ -49,3 +49,5 @@ Catatan implementasi terbaru: [Studio Anak K2/K3 dan batas ekspor](reviews/KIDS_
 Bukti pengujian live: [Smoke test Studio Anak K2/K3](reviews/KIDS_K2_K3_SMOKE_TEST.md).
 
 Identitas produk dan arah lokal: [Kelip Studio](BRANDING.md).
+
+Analisis media: [Crop bertangga dan kualitas HD](reviews/CROP_QUALITY_ANALYSIS.md).
