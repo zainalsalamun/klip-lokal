@@ -275,3 +275,10 @@ main{margin-left:230px;padding:0 40px;max-width:1500px}
 .clip-review>summary:focus-visible{outline:2px solid #748b3e;outline-offset:2px}
 .clip-draft-note{display:none;margin:8px 0 0;color:#805d21}
 .clip-review:has(.has-unsaved) .clip-draft-note{display:block}
+
+.subtitle-preview[data-style="cyan"] .subtitle-sample{color:#5ce8ff;font-size:23px}
+.subtitle-preview[data-style="lime"] .subtitle-sample{color:#d7ed67;font-size:23px}
+.subtitle-preview[data-style="pink"] .subtitle-sample{color:#ff80c2;font-size:23px}
+.subtitle-preview[data-style="orange"] .subtitle-sample{color:#ffb057;font-size:24px;-webkit-text-stroke:3px #101010}
+.subtitle-preview[data-style="purple_box"] .subtitle-sample{background:#4b305bdf;padding:6px 10px;border-radius:2px;-webkit-text-stroke:0;text-shadow:none}
+.subtitle-preview[data-style="light_box"] .subtitle-sample{color:#232c22;background:#fffffff0;padding:6px 10px;border-radius:2px;-webkit-text-stroke:0;text-shadow:none}

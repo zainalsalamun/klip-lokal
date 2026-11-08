@@ -115,7 +115,7 @@ Jangan membangun integrasi yang bergantung pada teks label `status`; gunakan `do
 Klip baru menyertakan `framing`: `mode` bernilai `speaker_estimate` atau `center`, beserta `note` dan opsional `face_samples`/`detail`. Field tidak ada pada hasil lama. Durasi request merupakan target; `end-start` dapat lebih pendek atau lebih panjang hingga 20% (maksimal 6 detik ditambah padding 0,15 detik) untuk mempertahankan segmen ucapan utuh.
 
 
-`POST /api/jobs` menerima field form opsional `subtitle_style`: `classic` (default), `bold_yellow`, `boxed`, atau `minimal`. Nilai selain daftar ini ditolak 400. Field disimpan pada pekerjaan, ringkasan history, dan setiap klip hasil. `GET /api/jobs/<id>` memberi `classic` untuk record lama yang belum memiliki field ini. Tidak ada perubahan pada file hasil lama; perubahan gaya membutuhkan pekerjaan baru.
+`POST /api/jobs` menerima field form opsional `subtitle_style`: `classic` (default), `bold_yellow`, `boxed`, `minimal`, `cyan`, `lime`, `pink`, `orange`, `purple_box`, atau `light_box`. Nilai selain daftar ini ditolak 400. Field disimpan pada pekerjaan, ringkasan history, dan setiap klip hasil. `GET /api/jobs/<id>` memberi `classic` untuk record lama yang belum memiliki field ini. Tidak ada perubahan pada file hasil lama; perubahan gaya membutuhkan pekerjaan baru.
 
 
 Caption baru dirangkum oleh AI lokal dari pembahasan tiap klip, bukan potongan awal transkrip. Target 6–12 kata, maksimal 16 kata / 120 karakter, tanpa CTA/hashtag otomatis. Hasil lama dapat dirangkum lewat **Buat caption AI lokal**. Draft hasil edit meminta konfirmasi sebelum diganti. Lihat [AI lokal](LOCAL_AI.md).

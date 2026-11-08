@@ -101,7 +101,7 @@ Ini heuristik visual dengan gerbang audio, bukan diarization atau model sinkroni
 
 ### Memilih gaya subtitle
 
-Di form Studio klip maupun Studio Global, buka **Gaya subtitle**. Tersedia Klasik (default lama: putih tebal ber-outline hitam), Kuning tebal, Kotak gelap, dan Minimal. Preview langsung memperlihatkan gambaran gaya; ukuran preview bukan ukuran piksel ekspor. Semua preset memakai font Arial dan posisi bawah yang sama, dengan ukuran relatif terhadap resolusi hasil. Pilihan mengubah tampilan subtitle yang dibakar ke MP4, bukan model pengenalan suara, bahasa, waktu subtitle, atau caption posting.
+Di form Studio klip maupun Studio Global, buka **Gaya subtitle**. Tersedia Klasik (default lama: putih tebal ber-outline hitam), Kuning tebal, Kotak gelap, Minimal, Biru cyan, Hijau lime, Pink cerah, Oranye hangat, Kotak ungu, dan Kotak terang. Preview langsung memperlihatkan gambaran gaya; ukuran preview bukan ukuran piksel ekspor. Semua preset memakai font Arial dan posisi bawah yang sama, dengan ukuran relatif terhadap resolusi hasil. Pilihan mengubah tampilan subtitle yang dibakar ke MP4, bukan model pengenalan suara, bahasa, waktu subtitle, atau caption posting.
 
 Pilihan disimpan pada pekerjaan dan klip. Membuka history mengembalikan pilihannya di form. Hasil lama tetap menggunakan Klasik. Mengubah dropdown hanya memengaruhi pemrosesan baru; untuk mengganti gaya video yang sudah jadi, proses ulang sumbernya. **Buat klip baru** mengembalikan gaya default Klasik.
 
