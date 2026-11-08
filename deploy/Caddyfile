@@ -1,0 +1,29 @@
+{$KELIP_DOMAIN} {
+	@foreign_origin {
+		method POST PUT PATCH DELETE
+		header Origin *
+		not header Origin https://{$KELIP_DOMAIN}
+	}
+	@cross_site {
+		method POST PUT PATCH DELETE
+		header Sec-Fetch-Site cross-site
+	}
+	route {
+		basic_auth {
+			{$KELIP_ADMIN_USER} {$KELIP_ADMIN_HASH}
+		}
+		respond @foreign_origin "Origin tidak diizinkan." 403
+		respond @cross_site "Permintaan lintas situs ditolak." 403
+		header {
+			X-Content-Type-Options nosniff
+			X-Frame-Options DENY
+			Referrer-Policy no-referrer
+			Strict-Transport-Security "max-age=31536000"
+			Cache-Control "private, no-store"
+		}
+		request_body {
+			max_size 2147483648
+		}
+		reverse_proxy 127.0.0.1:8765
+	}
+}

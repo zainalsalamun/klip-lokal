@@ -94,3 +94,5 @@ Runtime Node proyek memakai install script paket `node` untuk memasang binary se
 Pengujian checkout bersih menggunakan folder sementara dengan `.venv` dan runtime Node baru pada macOS Apple Silicon. Ollama dan model yang sudah terpasang pada mesin uji dipakai kembali. Pengujian ini tidak membuktikan instalasi Ollama pertama di semua OS, GPU, atau jaringan; alur model belum ada/unduhan terputus juga dicakup tes transport terisolasi.
 
 Lanjutan: [SETUP](SETUP.md), [LOCAL_AI](LOCAL_AI.md), [TROUBLESHOOTING](TROUBLESHOOTING.md), [TESTING](TESTING.md).
+
+Untuk VPS Ubuntu 24.04 x86_64 tersedia jalur terpisah pada [deployment VPS pribadi](DEPLOYMENT_VPS.md), memakai Gunicorn, Caddy dan systemd. Instalasi Linux tersebut memakai deploy/install.sh.

@@ -28,7 +28,7 @@ npm run doctor
 npm run dev
 ```
 
-`setup` membuat environment dan memasang dependensi proyek. `setup:ai` memeriksa runtime lokal dan mengunduh model jika belum tersedia. `doctor` memeriksa kesiapan tanpa mengubah instalasi. Setup dapat diulang; model yang sudah ada dipakai kembali. Ollama perlu dipasang pengguna terlebih dahulu dari sumber resmi. Windows/Linux belum didukung end-to-end oleh aplikasi.
+`setup` membuat environment dan memasang dependensi proyek. `setup:ai` memeriksa runtime lokal dan mengunduh model jika belum tersedia. `doctor` memeriksa kesiapan tanpa mengubah instalasi. Setup dapat diulang; model yang sudah ada dipakai kembali. Ollama perlu dipasang pengguna terlebih dahulu dari sumber resmi. Windows belum didukung end-to-end. Linux memiliki jalur deployment khusus pada [panduan VPS](docs/DEPLOYMENT_VPS.md), dengan validasi di VPS tujuan masih diperlukan.
 
 
 ### Pilihan 1: berjalan langsung di Terminal
@@ -129,3 +129,7 @@ Buka `/kids`, simpan brief lalu **Gunakan video sendiri** untuk kandidat berbaha
 ### Crop halus dan kualitas sumber
 
 Pemrosesan baru memakai posisi crop per-frame dengan deteksi pembicara tetap ringan. Target kualitas YouTube1080/1440/2160p terpisah dari ukuran ekspor; video/audio dapat diunduh terpisah dan digabung FFmpeg. Resolusi sumber aktual serta peringatan pembesaran ditampilkan. Hasil lama tidak diubah otomatis. Lihat [analisis dan perbaikan](docs/reviews/CROP_QUALITY_FIX.md).
+
+## Deployment VPS pribadi
+
+Paket Ubuntu 24.04 x86_64 tersedia di [panduan deployment](docs/DEPLOYMENT_VPS.md), dengan Gunicorn, Caddy HTTPS, satu login admin, Ollama localhost, pembatasan resource, update dan backup. Target 2 vCPU/RAM 4 GB perlu diuji penuh pada VPS tujuan.

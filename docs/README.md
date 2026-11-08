@@ -7,6 +7,7 @@ Mulai dari [README utama](../README.md) untuk instalasi cepat dan penggunaan apl
 | Dokumen | Kapan dibaca |
 | --- | --- |
 | [NEW_MACHINE](NEW_MACHINE.md) | Memasang dari checkout bersih pada komputer pengguna lain |
+| [Deployment VPS pribadi](DEPLOYMENT_VPS.md) | Installer Ubuntu, HTTPS/login admin, systemd, resource, backup dan uji penerimaan |
 | [SETUP](SETUP.md) | Memasang dependensi, menjalankan foreground/launcher, memperbarui instalasi |
 | [USAGE](USAGE.md) | Membuat klip, mengatur hasil, membuka dan menghapus history |
 | [GLOBAL](GLOBAL.md) | Subtitle/caption Inggris dengan audio asli dan ide editorial |

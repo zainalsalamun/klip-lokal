@@ -1,0 +1,11 @@
+[Unit]
+Description=Shared Kelip and Ollama resource budget for a 4 GB VPS
+
+[Slice]
+CPUAccounting=true
+MemoryAccounting=true
+CPUQuota=180%
+MemoryHigh=2800M
+MemoryMax=3200M
+MemorySwapMax=2G
+TasksMax=256

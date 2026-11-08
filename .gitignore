@@ -33,3 +33,6 @@ venv/
 *.gguf
 *.safetensors
 *.onnx
+
+# Private deployment credentials
+deploy/caddy.env

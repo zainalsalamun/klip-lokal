@@ -1,0 +1,40 @@
+[Unit]
+Description=Kelip Studio private video workspace
+Wants=network-online.target ollama.service
+After=network-online.target ollama.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=kelip
+Group=kelip
+WorkingDirectory=/opt/kelip
+ExecStart=/opt/kelip/.venv/bin/python -m gunicorn --config deploy/gunicorn.conf.py kelip.app:app
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=45
+KillMode=control-group
+OOMPolicy=stop
+Slice=kelip-workload.slice
+Environment=HOME=/var/lib/kelip
+Environment=XDG_CACHE_HOME=/var/cache/kelip
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+Environment=OMP_NUM_THREADS=2
+Environment=OPENBLAS_NUM_THREADS=2
+Environment=MKL_NUM_THREADS=2
+Environment=VECLIB_MAXIMUM_THREADS=2
+Environment=OPENCV_FOR_THREADS_NUM=2
+UMask=0077
+Nice=5
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/kelip/data /var/lib/kelip /var/cache/kelip
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

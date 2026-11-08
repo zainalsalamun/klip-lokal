@@ -53,3 +53,7 @@ Verifikasi UI yang berubah di browser, termasuk state error/empty/loading yang r
 Perbarui dokumen yang terdampak; gunakan path relatif pada dokumentasi yang masuk Git. Jangan commit `.venv/`, `data/`, model, log, token, `.env`, atau dependensi terpasang. Jangan mengubah pin dependensi tanpa alasan kompatibilitas dan verifikasi.
 
 Laporkan perubahan, pemeriksaan yang benar-benar dilakukan, serta batas yang masih ada. Jangan mengklaim commit, push, deployment atau CI yang tidak dijalankan. Lihat [kontribusi](CONTRIBUTING.md) untuk format penyerahan perubahan.
+
+## Deployment pribadi
+
+Untuk Linux VPS baca [DEPLOYMENT_VPS](docs/DEPLOYMENT_VPS.md) dan konfigurasi deploy/. Pertahankan satu worker Gunicorn karena reservasi pekerjaan bersifat in-process. Akses publik melewati autentikasi Caddy, dengan Gunicorn dan Ollama pada loopback. Periksa idle sebelum maintenance. Validasi service systemd, TLS publik dan batas RAM pada VPS terpisah dari data pengguna.
