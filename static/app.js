@@ -1192,6 +1192,13 @@ function clipOutputTools(clip, job, index) {
   return box;
 }
 
+const highlightReasons = new Map([
+  ['hook', 'Pembuka menarik'],
+  ['insight', 'Poin utama jelas'],
+  ['story', 'Cerita utuh'],
+  ['standalone', 'Mudah dipahami tanpa konteks tambahan']
+]);
+
 function render(job) {
   let sourceSummary = document.querySelector('#source-quality-summary');
   if (!sourceSummary) {
@@ -1205,6 +1212,8 @@ function render(job) {
   }
   const resultsNote = document.querySelector('#results-note') || document.querySelector('#results .results-head p');
   if (resultsNote) resultsNote.textContent = job.content_profile === 'kids' ? 'Kandidat untuk ditinjau · Anak 3–5 · Indonesia. Tujuan brief: ' + (job.kids_metadata?.brief_snapshot?.learning_goal || 'Tinjau konsep pembelajaran') + '. Label ini bukan sertifikasi kesesuaian usia.' : job.audience === 'global_en' ? 'Subtitle dan caption: English · suara asli dipertahankan. Tinjau terjemahan dan konteks sebelum posting.' : 'Pilihan berdasarkan transkrip, bukan jaminan viral. Tinjau framing dan batas ucapan sebelum posting.';
+  if (resultsNote && job.highlight_status === 'ai') resultsNote.textContent += ' Urutan rekomendasi dari AI lokal.';
+  if (resultsNote && job.highlight_status === 'fallback') resultsNote.textContent += ' AI lokal tidak dapat menilai kandidat. Kelip memakai urutan standar.';
   document.querySelector('#result-title').textContent = job.title || 'Klip siap ditinjau';
   const grid = document.querySelector('#clips');
   clearClips();
@@ -1267,6 +1276,12 @@ function render(job) {
       window.KlipSelect?.mount(review);
     });
     card.append(cardHead, time, video, text, source, download, review);
+    const reason = highlightReasons.get(c.highlight_reason);
+    if (reason) {
+      const reasonNote = document.createElement('p'); reasonNote.className = 'clip-reason';
+      reasonNote.textContent = 'Alasan AI: ' + reason;
+      text.after(reasonNote);
+    }
     grid.append(card);
     return {card, clip: c, index: i};
   });
@@ -1526,6 +1541,7 @@ async function openJob(id) {
       if (form.elements.source_quality) form.elements.source_quality.value = job.source_quality || '1080';
       form.elements.subtitle_style.value = job.subtitle_style || 'classic';
       if (form.elements.topic) form.elements.topic.value = job.topic || 'general';
+      if (form.elements.highlight_mode) form.elements.highlight_mode.value = job.highlight_mode || 'standard';
       syncFormat();
     }
     display(job);
@@ -1649,6 +1665,7 @@ if (form) {
       const health = await api('/api/health');
       if (!health.capabilities?.includes('wide_crop')) throw Error('Pilihan jarak crop memerlukan restart server. Setelah pekerjaan aktif selesai, hentikan aplikasi dengan Ctrl+C lalu jalankan npm run dev kembali.');
       if (form.elements.audience?.value === 'global_en' && !health.capabilities?.includes('global_en')) throw Error('Studio Global memerlukan server versi baru. Setelah video aktif selesai, restart server lalu coba lagi.');
+      if (form.elements.highlight_mode?.value === 'ai' && !health.capabilities?.includes('highlight_ai')) throw Error('Pemilihan momen AI memerlukan restart server. Setelah pekerjaan aktif selesai, jalankan ulang Kelip Studio.');
       const result = await api('/api/jobs', {method:'POST', body:new FormData(form)});
       clearTimeout(timer); ++selectionVersion;
       activeJobId = selectedJobId = result.id;

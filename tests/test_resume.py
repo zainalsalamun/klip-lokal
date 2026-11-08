@@ -70,31 +70,45 @@ class ResumeTests(unittest.TestCase):
         segments = [dict(start=0, end=1, text="Kalimat pertama."),
                     dict(start=1, end=2, text="Kalimat kedua.")]
         (self.folder / "transcript.json").write_text(json.dumps(segments))
-        m.jobs[self.jid] = dict(self.job, done=False, error=None)
+        m.jobs[self.jid] = dict(self.job, done=False, error=None, highlight_mode="ai")
+        ranked = [{**segments[1], "highlight_reason": "insight"}, {**segments[0], "highlight_reason": "hook"}]
         def fail_second(source, ass, out, *args, **kwargs):
             if out.name == "clip-2.mp4":
                 raise RuntimeError("render interrupted")
             shutil.copyfile(source, out)
             return {"mode": "fixture"}
 
-        with patch.object(m, "candidates", return_value=segments), \
+        with patch.object(m, "candidates", return_value=segments), patch.object(m, "rank_candidates", return_value=ranked), \
                 patch.object(m, "transcribe_audio") as transcribe, patch.object(m, "render_clip", side_effect=fail_second):
             m.process(self.jid, self.job["source_url"], None, 30, 3, "id", resume=True)
         transcribe.assert_not_called()
         failed = json.loads((self.folder / "job.json").read_text())
         self.assertTrue(failed["done"])
         self.assertEqual(len(failed["resume_clips"]), 1)
+        self.assertEqual(failed["highlight_selection"], ranked)
         original_clip = (self.folder / "clip-1.mp4").read_bytes()
         m.jobs.clear()
         m.jobs[self.jid] = dict(m.read_job(self.jid), done=False, error=None)
-        with patch.object(m, "candidates", return_value=segments), patch.object(m, "render_clip", return_value={"mode": "fixture"}) as render, \
+        with patch.object(m, "rank_candidates") as rank, patch.object(m, "render_clip", return_value={"mode": "fixture"}) as render, \
                 patch.object(m, "summarize", side_effect=m.CaptionUnavailable("offline")):
             m.process(self.jid, self.job["source_url"], None, 30, 3, "id", resume=True)
         self.assertEqual(render.call_count, 1)
+        rank.assert_not_called()
         self.assertEqual(render.call_args.args[2].name, "clip-2.mp4")
         self.assertEqual((self.folder / "clip-1.mp4").read_bytes(), original_clip)
         self.assertFalse(m.jobs[self.jid].get("error"))
         self.assertEqual(len(m.jobs[self.jid]["clips"]), 2)
+        self.assertEqual(m.jobs[self.jid]["clips"][0]["highlight_reason"], "insight")
+
+    def test_highlight_mode_is_validated_and_stored(self):
+        with patch.object(m.threading, "Thread"):
+            data = {"url": "https://youtu.be/fixture", "highlight_mode": "unknown"}
+            self.assertEqual(self.client.post("/api/jobs", data=data).status_code, 400)
+            data["highlight_mode"] = "ai"
+            self.assertEqual(self.client.post("/api/jobs", data={**data, "content_profile": "kids"}).status_code, 400)
+            response = self.client.post("/api/jobs", data=data)
+            self.assertEqual(response.status_code, 202)
+            self.assertEqual(m.jobs[response.json["id"]]["highlight_mode"], "ai")
 
     def test_busy_exports_and_successful_jobs_cannot_resume(self):
         with patch.object(m, "active_export", ("other", "clip", "export")):

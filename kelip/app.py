@@ -12,6 +12,7 @@ import imageio_ffmpeg
 from .global_content import TOPICS, IDEAS, SOURCES
 from .subtitle_styles import SUBTITLE_STYLES
 from .local_caption import summarize, CaptionUnavailable, UnclearTranscript, inference_lock
+from .highlight_rank import rank_candidates
 from . import watermark
 from . import kids_content
 from . import clip_exports
@@ -378,9 +379,21 @@ def process(jid, url, local, duration, count, lang, resolution="720", audience="
             temporary.write_text(json.dumps(segments, ensure_ascii=False), encoding="utf-8")
             temporary.replace(transcript)
         update(jid,status="Mencari kandidat klip dari transkrip…",progress=65)
-        if jobs[jid].get("content_profile") == "kids":
-            goal = jobs[jid].get("kids_metadata", {}).get("brief_snapshot", {}).get("learning_goal", "")
+        job = jobs[jid]
+        if job.get("content_profile") == "kids":
+            goal = job.get("kids_metadata", {}).get("brief_snapshot", {}).get("learning_goal", "")
             selected = candidates(segments, duration, count, topic, learning_goal=goal)
+        elif job.get("highlight_mode") == "ai":
+            selected = job.get("highlight_selection") if resume else None
+            if not selected:
+                shortlist = candidates(segments, duration, count + 3, topic)
+                ranked = None
+                if len(shortlist) > 1:
+                    update(jid,status="AI lokal menilai kandidat klip…",progress=67)
+                    ranked = rank_candidates(shortlist, count, topic)
+                selected = ranked if ranked is not None else shortlist[:count]
+                highlight_status = "ai" if ranked is not None else ("fallback" if len(shortlist) > 1 else "single")
+                update(jid, highlight_selection=selected, highlight_status=highlight_status)
         else:
             selected = candidates(segments, duration, count, topic)
         if not selected:
@@ -424,7 +437,7 @@ def process(jid, url, local, duration, count, lang, resolution="720", audience="
             except (CaptionUnavailable, UnclearTranscript) as exc:
                 clip.update(caption="",caption_source="none",caption_status="needs_review" if isinstance(exc,UnclearTranscript) else "unavailable",caption_note=str(exc))
             update(jid, resume_clips=copy.deepcopy(clips))
-        update(jid,status="Selesai",progress=100,clips=clips,done=True,schema_version=2,resume_clips=[])
+        update(jid,status="Selesai",progress=100,clips=clips,done=True,schema_version=2,resume_clips=[],highlight_selection=None)
     except Exception as exc:
         update(jid,status="Gagal",error=str(exc),done=True)
 
@@ -443,7 +456,7 @@ def too_large(error):
 def health():
     with lock:
         active = sum(not job.get("done") for job in jobs.values())
-    return jsonify(app="klip-lokal", status="ok", active_jobs=active + int(active_export is not None), active_exports=int(active_export is not None), active_caption=inference_lock.locked() or bool(caption_requests), capabilities=["history_delete", "history_pagination", "global_en", "local_caption_ai", "caption_persistence", "watermark", "kids_studio", "kids_pipeline", "clip_exports", "smooth_crop", "source_quality", "wide_crop", "resume_jobs"])
+    return jsonify(app="klip-lokal", status="ok", active_jobs=active + int(active_export is not None), active_exports=int(active_export is not None), active_caption=inference_lock.locked() or bool(caption_requests), capabilities=["history_delete", "history_pagination", "global_en", "local_caption_ai", "caption_persistence", "watermark", "kids_studio", "kids_pipeline", "clip_exports", "smooth_crop", "source_quality", "wide_crop", "resume_jobs", "highlight_ai"])
 
 @app.get("/favicon.ico")
 def favicon(): return redirect("/static/favicon.svg", code=302)
@@ -667,6 +680,8 @@ def create():
         if lang not in ("auto","id","en"): raise ValueError()
         audience=request.form.get("audience", "local")
         topic=request.form.get("topic", "general")
+        highlight_mode=request.form.get("highlight_mode", "standard")
+        if highlight_mode not in ("standard", "ai"): raise ValueError()
         if audience not in ("local", "global_en") or topic not in TOPICS: raise ValueError()
         if audience == "local": topic = "general"
     except ValueError: return jsonify(error="Pengaturan tidak valid."),400
@@ -675,6 +690,8 @@ def create():
     if content_profile not in ("general", "kids"):
         return jsonify(error="Profil konten tidak valid."), 400
     if content_profile == "kids":
+        if highlight_mode != "standard":
+            return jsonify(error="Studio Anak memilih momen sesuai tujuan brief."), 400
         if audience != "local" or lang != "id":
             return jsonify(error="Studio Anak hanya mendukung audience lokal dan bahasa Indonesia (id)."), 400
         if request.form.get("source_kind", "speech") != "speech":
@@ -700,7 +717,7 @@ def create():
         jobs[jid]=dict(id=jid, schema_version=2, title="Video YouTube" if url else original_name,
                        source_url=url or None, source_name=original_name if not url else None,
                        content_profile=content_profile, kids_metadata=kids_metadata,
-                       source_quality=source_quality, framing_layout=framing_layout,
+                       source_quality=source_quality, framing_layout=framing_layout, highlight_mode=highlight_mode,
                        duration=duration, count=count, language=lang, resolution=resolution, audience=audience, topic=topic, subtitle_style=subtitle_style,
                        created_at=now, updated_at=now,
                        status="Dalam antrean…",progress=0,done=False,clips=[])
@@ -830,6 +847,8 @@ def history():
 @app.get("/api/jobs/<jid>")
 def status(jid):
     job = read_job(jid)
+    if job:
+        job.pop("highlight_selection", None)
     return (jsonify(job),200) if job else (jsonify(error="Proses tidak ditemukan."),404)
 
 @app.patch("/api/jobs/<jid>/clips/<clip_ref>/caption")

@@ -159,14 +159,21 @@ class RealBrowserCaptionTests(unittest.TestCase):
           if (path === '/api/watermark-presets') presetRequests.push(path);
           return {presets:[]};
         };
-        render({id:'review-fixture', clips:[
-          {clip_id:'a', url:'a.mp4', start:12, end:17, score:7, text:'Pertama'},
+        const highlight = document.querySelector('#highlight-mode');
+        assert(highlight.value === 'standard', 'Mode standar dipilih saat halaman dibuka');
+        document.querySelector('#highlight-mode-control').click();
+        document.querySelector('#highlight-mode-option-1').click();
+        assert(new FormData(form).get('highlight_mode') === 'ai', 'Dropdown mengirim mode AI');
+        render({id:'review-fixture', highlight_status:'ai', clips:[
+          {clip_id:'a', url:'a.mp4', start:12, end:17, score:7, text:'Pertama', highlight_reason:'insight'},
           {clip_id:'b', url:'b.mp4', start:0, end:11, score:5, text:'Kedua'},
           {clip_id:'c', url:'c.mp4', start:20, end:39, text:'Hasil lama'},
         ]});
         const [first, second, third] = clipsGrid.children;
         assert(!clipsGrid.querySelector('.caption-editor') && presetRequests.length === 0, 'Editor dan request preset belum dimuat');
         assert(!first.querySelector('.clip-score').hidden && third.querySelector('.clip-score').hidden, 'Skor hanya muncul jika tersedia');
+        assert(first.querySelector('.clip-reason').textContent.includes('Poin utama jelas'), 'Alasan AI tampil di kartu');
+        assert(results.querySelector('#results-note').textContent.includes('Urutan rekomendasi dari AI lokal'), 'Mode yang dipakai tampil di hasil');
         assert(document.querySelector('.clip-toolbar').textContent.includes('3 kandidat klip'), 'Jumlah kandidat tampil');
         first.querySelector('summary').click();
         await new Promise(resolve => setTimeout(resolve, 50));

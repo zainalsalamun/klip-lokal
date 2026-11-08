@@ -21,6 +21,8 @@ Menu pilihan memakai tampilan terang yang seragam. Klik opsi untuk memilih; keyb
 
 ## Meninjau hasil
 
+Di **Studio klip** dan **Studio Global**, pilihan **Pemilihan momen** menentukan cara kandidat diurutkan. **Standar** memakai skor transkrip yang sudah ada. **AI lokal** memakai Qwen3 1.7B di Ollama untuk memilih dari maksimal delapan kandidat dan menampilkan alasan singkat pada setiap hasil. AI memakai cuplikan transkrip dan mempertahankan batas waktu kandidat. Jika model belum tersedia atau hasil penilaian gagal, Kelip melanjutkan dengan urutan standar. Opsi ini menambah satu panggilan model saat tersedia lebih dari satu kandidat.
+
 Kartu hasil menampilkan pemutar, waktu di video asli, durasi, cuplikan transkrip, dan **Unduh MP4**. Gunakan **Urutkan klip** untuk memilih urutan rekomendasi, waktu di sumber, atau durasi terpanjang. Skor yang tersedia berasal dari penilaian kandidat berdasarkan transkrip. Hasil lama tanpa skor tetap bisa dibuka.
 
 Buka **Edit & ekspor** pada kartu untuk mengatur caption, watermark, dan thumbnail. Editor dimuat saat panel dibuka. Menutup panel atau mengubah urutan kartu mempertahankan draft pada halaman itu. Gunakan tombol simpan untuk menyimpan draft ke metadata pekerjaan.

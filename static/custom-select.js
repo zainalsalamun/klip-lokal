@@ -17,6 +17,8 @@
     const trigger = document.createElement('button'); trigger.type = 'button'; trigger.className = 'select-trigger';
     trigger.id = select.id + '-control'; trigger.setAttribute('role', 'combobox');
     trigger.setAttribute('aria-haspopup', 'listbox'); trigger.setAttribute('aria-expanded', 'false');
+    const description = select.getAttribute('aria-describedby');
+    if (description) trigger.setAttribute('aria-describedby', description);
     const text = document.createElement('span'); text.className = 'select-value';
     const arrow = document.createElement('span'); arrow.className = 'select-chevron'; arrow.setAttribute('aria-hidden', 'true');
     trigger.append(text, arrow);

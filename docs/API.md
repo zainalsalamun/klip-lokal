@@ -30,6 +30,7 @@ Content type: `multipart/form-data`. Mengembalikan 202 setelah pekerjaan diterim
 | `count` | integer | 3 | Salah satu 1, 3, 5 |
 | `audience` | string | local | `local` atau `global_en`; Global memakai subtitle/caption Inggris dan suara asli |
 | `topic` | string | general | `general`, `habits`, `tech`, `career`, `culture`; mode lokal menormalkan ke general |
+| `highlight_mode` | string | standard | `standard` atau `ai`. Studio Anak memakai `standard` sesuai tujuan brief. |
 | `resolution` | string | 720 | `480`, `720`, `1080` (ukuran keluaran: 480×854, 720×1280, 1080×1920) |
 | `language` | string | auto | `auto`, `id`, `en` |
 
@@ -58,6 +59,8 @@ Respons 202:
 Kode kesalahan: 400 untuk input/parameter tidak valid atau unggahan gagal disimpan; 409 bila ada pekerjaan aktif; 413 bila request terlalu besar. Respons 202 bukan jaminan pemrosesan berhasil: periksa endpoint status.
 
 ## GET /api/jobs/<id>
+
+Pekerjaan dengan `highlight_mode=ai` dapat memuat `highlight_status=ai` (AI memilih kandidat), `fallback` (urutan standar digunakan), atau `single` (hanya satu kandidat untuk pekerjaan yang menghasilkan klip). Jika AI berhasil, setiap klip juga memuat `highlight_reason` dengan nilai `hook`, `insight`, `story`, atau `standalone`. Skor kandidat tetap berasal dari heuristik transkrip.
 
 ID adalah 32 karakter heksadesimal kecil. Status ditemukan dari memori, atau dari `data/<id>/job.json` bila proses server baru dimulai. ID tidak ditemukan mengembalikan 404.
 
