@@ -549,7 +549,7 @@ function watermarkEditor(clip, index, jobId) {
   statusBadge.setAttribute('role', 'status'); statusBadge.setAttribute('aria-live', 'polite');
 
   const saveBtn = document.createElement('button'); saveBtn.type = 'button'; saveBtn.className = 'btn-save-watermark';
-  saveBtn.textContent = 'Simpan watermark'; saveBtn.disabled = true;
+  saveBtn.textContent = 'Simpan watermark klip'; saveBtn.disabled = true;
 
   function isDirty() {
     return JSON.stringify(currentWm) !== JSON.stringify(savedWm);
@@ -705,7 +705,7 @@ function watermarkEditor(clip, index, jobId) {
   actions.append(saveBtn, feedback);
 
   const exportNote = document.createElement('p'); exportNote.className = 'watermark-note';
-  exportNote.textContent = 'Simpan draft lalu gunakan Ekspor MP4 watermark di bawah. Hasil baru terpisah dari MP4 awal; audio dan subtitle yang sudah ada dipertahankan.';
+  exportNote.textContent = 'Simpan watermark klip untuk menyimpan pengaturan di kartu ini. Ekspor juga menyimpan perubahan watermark terlebih dahulu. Preset disimpan sebagai template untuk digunakan kembali.';
 
   function syncTypeUI() {
     const isLogo = currentWm.type === 'logo';
@@ -1023,8 +1023,10 @@ function watermarkEditor(clip, index, jobId) {
         body: JSON.stringify({ name: name.trim(), configuration: currentWm })
       });
       await loadPresetList();
-      feedback.textContent = 'Preset baru berhasil disimpan.';
+      feedback.classList.remove('is-error');
+      feedback.textContent = 'Preset tersimpan. Pengaturan klip disimpan saat kamu memilih Simpan watermark klip atau mengekspor.';
     } catch (err) {
+      feedback.classList.add('is-error');
       feedback.textContent = 'Gagal menyimpan preset: ' + err.message;
     }
   });
@@ -1110,7 +1112,7 @@ function watermarkEditor(clip, index, jobId) {
 function clipOutputTools(clip, job, index) {
   const box = document.createElement('section'); box.className = 'clip-output-tools';
   const title = document.createElement('h3'); title.textContent = 'Tinjau & ekspor versi baru';
-  const note = document.createElement('p'); note.textContent = 'Tinjau video, edit caption dan simpan watermark di atas. Trim/subtitle manual belum tersedia. Thumbnail dibuat dari frame klip ini; tanpa ilustrasi atau judul buatan.';
+  const note = document.createElement('p'); note.textContent = 'Ekspor menyimpan perubahan watermark klip sebelum membuat file baru. Thumbnail diambil dari frame klip ini.';
   const frameLabel = document.createElement('label'); frameLabel.textContent = 'Waktu frame thumbnail (detik dalam klip)';
   const frame = document.createElement('input'); frame.type = 'number'; frame.min = '0'; frame.step = '0.1'; frame.value = '0';
   frameLabel.append(frame);
@@ -1151,11 +1153,22 @@ function clipOutputTools(clip, job, index) {
   }
   async function start(kind) {
     if (busy) return;
-    if (box.closest('.clip')?.querySelector('.watermark-editor.has-unsaved')) { status.textContent = 'Simpan draft watermark terlebih dahulu.'; return; }
     const time = Number(frame.value);
-    if (!Number.isFinite(time) || time < 0) { status.textContent = 'Isi waktu frame yang valid.'; return; }
+    if (kind === 'thumbnail' && (!Number.isFinite(time) || time < 0)) { status.textContent = 'Isi waktu frame yang valid.'; return; }
     busy = true; video.disabled = image.disabled = true; status.textContent = 'Menyiapkan ekspor lokal…';
     try {
+      const editor = box.closest('.clip')?.querySelector('.watermark-editor.has-unsaved');
+      if (editor) {
+        status.textContent = 'Menyimpan watermark klip…';
+        await draftSavers.get(editor)?.();
+        if (!box.isConnected) return;
+        if (editor.classList.contains('has-unsaved')) {
+          status.textContent = 'Ekspor menunggu watermark tersimpan. Periksa status di editor watermark.';
+          editor.scrollIntoView({block:'center'});
+          return;
+        }
+      }
+      status.textContent = 'Menyiapkan ekspor lokal…';
       const result = await api(base + '/exports', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
         request_id:crypto.randomUUID().replaceAll('-', ''), kind, frame_time:kind === 'thumbnail' ? time : 0,
         ratio:ratio.value, expected_watermark_revision:clip.watermark_revision || 1

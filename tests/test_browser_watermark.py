@@ -110,6 +110,43 @@ class RealBrowserWatermarkTests(unittest.TestCase):
                 self.fail(f"Uji Chrome gagal: {data.get('error')}\n{data.get('stack')}")
             return data.get("logs", [])
 
+    def test_export_waits_for_watermark_save_and_uses_new_revision(self):
+        script = """
+        let failSave = true;
+        const calls = [];
+        window.api = async (url, opts) => {
+          if (opts?.method === 'PATCH') {
+            calls.push('save');
+            if (failSave) throw Error('Simulasi gagal menyimpan');
+            return {watermark: JSON.parse(opts.body).watermark, watermark_revision: 4};
+          }
+          if (url.endsWith('/exports')) {
+            calls.push(JSON.parse(opts.body).expected_watermark_revision);
+            return {export:{export_id:'fixture', kind:'video', status:'done'}};
+          }
+          return {presets:[]};
+        };
+        render({id:'fixture', done:true, clips:[{clip_id:'clip', url:'fixture.mp4', start:0,
+          end:3, text:'Fixture', watermark_revision:3, watermark:{enabled:true,type:'text',text:'Awal'}}]});
+        document.querySelector('.clip-review summary').click();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const editor = document.querySelector('.watermark-editor');
+        const text = editor.querySelector('input[type="text"]');
+        text.value = 'Watermark baru';
+        text.dispatchEvent(new Event('input'));
+        const exportButton = document.querySelector('.clip-output-tools .watermark-actions button');
+        exportButton.click();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        assert(calls.join() === 'save', 'Gagal simpan mencegah permintaan ekspor');
+        assert(editor.classList.contains('has-unsaved') && text.value === 'Watermark baru', 'Draft tetap tersedia');
+        failSave = false;
+        exportButton.click();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        assert(calls.join() === 'save,save,4', 'Ekspor memakai revisi hasil simpan');
+        assert(document.querySelector('.clip-export-list a'), 'Link hasil tampil setelah sukses');
+        """
+        self._run_chrome_test(script)
+
     def test_real_browser_watermark_editor_desktop_flow(self):
         """Memverifikasi toggle aktif, pemilihan teks/posisi, peringatan benturan subtitle, dan penyimpanan draft di Chrome desktop."""
         script = """

@@ -62,7 +62,7 @@ Setiap klip menyediakan panel **Watermark (Teks / Logo)** opsional yang dapat di
    - Klik **Simpan watermark** untuk menyimpan pengaturan ke metadata server (`job.json`) dengan nomor revisi watermark (`watermark_revision`).
    - Revisi watermark terpisah dari revisi caption: mengedit dan menyimpan watermark tidak membatalkan atau memicu konflik pada editor caption di kartu yang sama.
    - Jika terjadi konflik dari tab/sesi lain, opsi **Pakai versi server** akan menyinkronkan seluruh kontrol form (tipe teks/logo, input, dropdown, slider, tombol posisi, dan thumbnail logo) ke versi server terkini.
-   - *Catatan dependensi*: Pembakaran watermark ke file MP4 baru akan diintegrasikan dengan lifecycle render versi pada milestone ekspor ulang (M3). Saat ini draft tersimpan aman di server dan dapat dipratinjau secara langsung di editor.
+   - Pilih **Ekspor MP4 watermark** untuk menerapkan watermark ke versi video baru. Detail tersedia di bagian [Ekspor watermark dan thumbnail](#ekspor-watermark-dan-thumbnail-dari-klip).
 
 ## Data, riwayat, dan penghentian
 
@@ -143,7 +143,7 @@ Riwayat menampilkan **Anak · 3–5** dan hasil memakai label **Kandidat untuk d
 
 ## Ekspor watermark dan thumbnail dari klip
 
-Di tiap kartu, edit caption atau simpan draft watermark. Pada **Tinjau & ekspor versi baru**, klik **Ekspor MP4 watermark** untuk membakar watermark tersimpan ke berkas MP4 baru. Audio serta subtitle yang sudah menyatu pada klip dipertahankan. Tombol Unduh MP4 awal tetap mengambil klip awal; unduh hasil watermark melalui **Unduh hasil** pada daftar ekspor.
+Di tiap kartu, gunakan **Simpan watermark klip** untuk menyimpan watermark ke klip itu. **Simpan preset baru** menyimpan template yang bisa dipakai ulang. Tombol ekspor MP4 dan PNG menyimpan perubahan watermark klip terlebih dahulu, lalu melanjutkan setelah penyimpanan berhasil. Pada **Tinjau & ekspor versi baru**, klik **Ekspor MP4 watermark** untuk membakar watermark tersimpan ke berkas MP4 baru. Audio serta subtitle yang sudah menyatu pada klip dipertahankan. Tombol Unduh MP4 awal tetap mengambil klip awal; unduh hasil watermark melalui **Unduh hasil** pada daftar ekspor.
 
 Untuk gambar, pilih waktu frame dalam detik relatif terhadap klip dan rasio9:16 (1080×1920) atau16:9 (1280×720), lalu **Buat thumbnail PNG**. Gambar memakai frame klip sebenarnya, fit dengan bidang hitam bila rasio berbeda, dan watermark tersimpan bila aktif. Belum ada editor judul/template thumbnail atau trim/subtitle manual.
 
