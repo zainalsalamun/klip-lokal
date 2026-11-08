@@ -115,6 +115,146 @@ class RealBrowserCaptionTests(unittest.TestCase):
                 self.fail(f"Uji Chrome gagal: {data.get('error')}\n{data.get('stack')}")
             return data.get("logs", [])
 
+    def test_clip_source_links_and_local_filename(self):
+        script = """
+        window.api = async () => ({presets:[]});
+        const job = {id:'source-fixture', title:'Video asli', audience:'local',
+          source_url:'https://www.youtube.com/watch?v=fixture',
+          clips:[1,2,3].map(i => ({clip_id:'clip-'+i, url:'fixture.mp4', start:0, end:5, text:'Fixture'}))};
+        render(job);
+        const links = [...document.querySelectorAll('.clip-source a')];
+        assert(links.length === 3, 'Setiap klip menampilkan link sumber');
+        assert(links.every(link => link.href === job.source_url && link.target === '_blank' && link.rel.includes('noopener')), 'Link video asli aman dibuka di tab baru');
+
+        const videos = [...document.querySelectorAll('#clips video')];
+        assert(videos.every(video => video.preload === 'none'), 'Video tidak dimuat sebelum diputar');
+        let pauses = 0, released = 0;
+        videos.forEach(video => {
+          video.pause = () => { pauses++; };
+          video.load = () => { released++; };
+        });
+        videos[2].dispatchEvent(new Event('play'));
+        assert(pauses === 2, 'Memutar satu klip menjeda klip lainnya');
+
+        delete job.source_url;
+        job.source_name = '<contoh video>.mp4';
+        render(job);
+        assert(document.querySelector('.clip-source').textContent.includes(job.source_name), 'Nama file lokal tampil sebagai teks');
+        assert(!document.querySelector('.clip-source a'), 'File lokal tidak memiliki link YouTube');
+        assert(released === 3 && videos.every(video => !video.hasAttribute('src')), 'Pergantian hasil melepas semua sumber video lama');
+
+        delete job.source_name;
+        render(job);
+        assert(document.querySelector('.clip-source').textContent.includes('belum tersedia'), 'Hasil lama memiliki keterangan sumber kosong');
+        job.source_url = 'javascript:alert(1)';
+        render(job);
+        assert(!document.querySelector('.clip-source a'), 'URL berbahaya tidak dibuat menjadi link');
+        """
+        self._run_chrome_test(script, window_size="375,667")
+
+    def test_sorting_compact_clips_keeps_draft_and_loads_only_opened_editor(self):
+        script = """
+        const presetRequests = [];
+        window.api = async path => {
+          if (path === '/api/watermark-presets') presetRequests.push(path);
+          return {presets:[]};
+        };
+        render({id:'review-fixture', clips:[
+          {clip_id:'a', url:'a.mp4', start:12, end:17, score:7, text:'Pertama'},
+          {clip_id:'b', url:'b.mp4', start:0, end:11, score:5, text:'Kedua'},
+          {clip_id:'c', url:'c.mp4', start:20, end:39, text:'Hasil lama'},
+        ]});
+        const [first, second, third] = clipsGrid.children;
+        assert(!clipsGrid.querySelector('.caption-editor') && presetRequests.length === 0, 'Editor dan request preset belum dimuat');
+        assert(!first.querySelector('.clip-score').hidden && third.querySelector('.clip-score').hidden, 'Skor hanya muncul jika tersedia');
+        assert(document.querySelector('.clip-toolbar').textContent.includes('3 kandidat klip'), 'Jumlah kandidat tampil');
+        first.querySelector('summary').click();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const input = first.querySelector('.caption-editor textarea');
+        assert(Boolean(input) && !second.querySelector('.caption-editor') && presetRequests.length === 1, 'Hanya editor terpilih yang dimuat');
+        input.value = 'Draft perlu disimpan';
+        input.dispatchEvent(new Event('input'));
+        first.querySelector('summary').click();
+        assert(hasUnsavedCaptionEdits() && first.querySelector('.clip-draft-note').getClientRects().length, 'Draft masih dijaga saat panel tertutup');
+
+        const sort = document.querySelector('#clip-sort-control');
+        function choose(key) {
+          sort.click();
+          sort.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles:true}));
+          sort.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true}));
+        }
+        choose('ArrowDown');
+        assert(clipsGrid.firstElementChild === second, 'Urutan waktu tersedia melalui keyboard');
+        choose('End');
+        assert(clipsGrid.firstElementChild === third, 'Urutan durasi menempatkan yang terpanjang di awal');
+        choose('Home');
+        assert(clipsGrid.firstElementChild === first, 'Kembali ke urutan rekomendasi');
+        first.querySelector('summary').click();
+        assert(first.querySelector('textarea') === input && input.value === 'Draft perlu disimpan' && presetRequests.length === 1, 'Urutkan dan buka ulang tanpa kehilangan draft atau memuat ulang editor');
+        assert(document.documentElement.scrollWidth <= document.documentElement.clientWidth, 'Kartu dan pengurutan muat di layar sempit');
+
+        render({id:'empty', clips:[]});
+        assert(results.hidden && !document.querySelector('.clip-toolbar'), 'Hasil kosong membersihkan kartu dan pengurutan');
+        """
+        self._run_chrome_test(script, window_size="375,667")
+
+    def test_new_project_starts_empty_and_opens_completed_result_in_history(self):
+        script = """
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const oldJob = {id:'old', title:'Klip lama', done:true, clip_count:1,
+          source_url:'https://youtu.be/old', duration:60, audience:'local',
+          clips:[{clip_id:'clip-1', url:'fixture.mp4', start:0, end:4, text:'Fixture'}]};
+        const newJob = {...oldJob, id:'new', title:'Klip baru'};
+        const jobs = [oldJob];
+        const detailRequests = [];
+        window.api = async (path, options) => {
+          if (path === '/api/health') return {capabilities:['wide_crop']};
+          if (path === '/api/jobs' && options?.method === 'POST') {
+            jobs.unshift(newJob);
+            return {id:newJob.id};
+          }
+          if (path.startsWith('/api/jobs?')) return {jobs};
+          if (path.startsWith('/api/jobs/')) {
+            detailRequests.push(path);
+            return path.endsWith('/new') ? newJob : oldJob;
+          }
+          return {presets:[]};
+        };
+        localStorage.setItem('klip-selected', oldJob.id);
+        localStorage.setItem('klip-job', oldJob.id);
+        await init();
+        assert(!urlEl.value && form.elements.duration.value === '30', 'Proyek baru kosong walau ada riwayat lama');
+        assert(results.hidden && detailRequests.length === 0, 'Hasil lama tidak diambil otomatis');
+
+        urlEl.value = 'https://youtu.be/new';
+        form.dispatchEvent(new Event('submit', {cancelable:true}));
+        await new Promise(resolve => setTimeout(resolve, 50));
+        assert(location.hash === '#history' && !results.hidden, 'Pekerjaan selesai dibuka di Riwayat');
+        assert(studioContent.hidden && !historyPanel.hidden, 'Form proyek tersembunyi saat hasil ditinjau');
+        assert(document.querySelector('#result-title').textContent === 'Klip baru', 'Hasil baru ditampilkan');
+        assert(historyList.querySelector('[data-id="old"]'), 'Riwayat lama masih tersedia');
+        assert(!urlEl.value && !button.disabled, 'Form siap untuk proyek berikutnya');
+
+        location.hash = '';
+        await new Promise(resolve => setTimeout(resolve, 50));
+        assert(results.hidden && !studioContent.hidden && !urlEl.value, 'Kembali ke studio membuka form kosong');
+
+        let finishBackgroundJob;
+        const pending = {id:'running', title:'Video aktif', done:false, clip_count:0};
+        jobs.unshift(pending);
+        const previousApi = window.api;
+        window.api = async (path, options) => {
+          if (path === '/api/jobs/running') return new Promise(resolve => { finishBackgroundJob = resolve; });
+          return previousApi(path, options);
+        };
+        await init();
+        assert(button.disabled && !urlEl.value && results.hidden, 'Pekerjaan aktif tidak mengisi form proyek baru');
+        finishBackgroundJob({...pending, done:true, clips:oldJob.clips});
+        await new Promise(resolve => setTimeout(resolve, 50));
+        assert(!button.disabled && !location.hash && results.hidden, 'Pekerjaan dari sesi lain tidak memindahkan halaman');
+        """
+        self._run_chrome_test(script)
+
     def test_real_browser_save_button_busy_vs_dirty_desktop(self):
         """Memverifikasi tombol Simpan tetap disabled saat pending, menolak klik ganda, dan pulih setelah error/sukses."""
         script = """
@@ -148,6 +288,8 @@ class RealBrowserCaptionTests(unittest.TestCase):
           }]
         };
         render(testJob);
+        document.querySelector('.clip-review summary').click();
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         const box = document.querySelector('.caption-editor');
         const ta = box.querySelector('textarea');
@@ -237,6 +379,8 @@ class RealBrowserCaptionTests(unittest.TestCase):
           }]
         };
         render(testJob);
+        document.querySelector('.clip-review summary').click();
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         const box = document.querySelector('.caption-editor');
         const rect = box.getBoundingClientRect();
@@ -333,6 +477,8 @@ class RealBrowserCaptionTests(unittest.TestCase):
           }]
         };
         render(testJob);
+        document.querySelector('.clip-review summary').click();
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         const box = document.querySelector('.caption-editor');
         const ta = box.querySelector('textarea');

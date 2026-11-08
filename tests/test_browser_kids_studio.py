@@ -181,6 +181,8 @@ class RealBrowserKidsStudioTests(unittest.TestCase):
         await openJob(job.id);
         assert(document.querySelector('#result-title').textContent === job.title, 'Klik ulang memuat versi terbaru');
 
+        results.querySelector('.clip-review summary').click();
+        await new Promise(resolve => setTimeout(resolve, 50));
         const caption = results.querySelector('textarea');
         caption.value = 'Draft belum disimpan';
         caption.dispatchEvent(new Event('input'));

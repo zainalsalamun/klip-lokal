@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const source = fs.readFileSync('static/app.js', 'utf8');
-const block = source.slice(source.indexOf('class ConnectionError'), source.indexOf('function remember('));
+const block = source.slice(source.indexOf('class ConnectionError'), source.indexOf('function showError('));
 function client(fetch) {
   const context = {fetch}; vm.createContext(context);
   return vm.runInContext(block + '\n({api, ConnectionError})', context);

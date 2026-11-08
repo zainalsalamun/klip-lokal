@@ -87,7 +87,7 @@
   document.addEventListener('focusin', event => { if (opened && !opened.wrap.contains(event.target)) close(); });
   document.querySelector('#form')?.addEventListener('reset', () => { close(); queueMicrotask(refresh); });
   function mount(root) {
-    root.querySelectorAll('.options select, .thumbnail-ratio').forEach(enhance);
+    root.querySelectorAll('.options select, .thumbnail-ratio, #clip-sort').forEach(enhance);
     refresh();
   }
   window.KlipSelect = {mount, refresh};

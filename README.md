@@ -63,7 +63,7 @@ Semua script mencari source relatif terhadap lokasinya sendiri. Folder repositor
 2. Tentukan target durasi 15/30/45/60 detik, jumlah kandidat 1/3/5, bahasa suara, dan resolusi hasil.
 3. Pilih **Gaya subtitle**: Klasik (default), Kuning tebal, Kotak gelap, atau Minimal. Preview tersedia sebelum memproses.
 4. Klik **Cari momen & buat klip** dan tunggu proses selesai.
-5. Putar hasil untuk meninjau crop, isi, subtitle dan caption; unduh MP4 yang dipilih. Caption posting bisa diedit, disalin atau diunduh sebagai TXT.
+5. Urutkan kandidat dan putar hasil untuk meninjau isi, crop dan subtitle. Unduh MP4 langsung dari kartu atau buka **Edit & ekspor** untuk mengatur caption, watermark dan thumbnail.
 6. Klik **Buat klip baru** untuk video berikutnya. Hasil sebelumnya tersedia lewat menu **Riwayat klip**, termasuk setelah refresh/restart. Daftar memakai area utama, 10 video per halaman, pencarian dan filter status.
 7. Klik **Hapus** pada history yang tidak diperlukan untuk menghapus seluruh berkas pekerjaan dari disk, lalu konfirmasi. Pekerjaan aktif tidak bisa dihapus.
 

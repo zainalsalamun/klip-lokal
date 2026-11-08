@@ -157,6 +157,8 @@ class RealBrowserWatermarkTests(unittest.TestCase):
           }]
         };
         render(testJob);
+        document.querySelector('.clip-review summary').click();
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         const card = document.querySelector('#clips .clip');
         assert(Boolean(card), 'Card klip tersedia');
@@ -245,6 +247,8 @@ class RealBrowserWatermarkTests(unittest.TestCase):
           }]
         };
         render(testJob);
+        document.querySelector('.clip-review summary').click();
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         const wmBox = document.querySelector('.watermark-editor');
         const clientWidth = document.documentElement.clientWidth;
@@ -330,6 +334,8 @@ class RealBrowserWatermarkTests(unittest.TestCase):
           }]
         };
         render(testJob);
+        document.querySelector('.clip-review summary').click();
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         const wmBox = document.querySelector('.watermark-editor');
         const textInput = wmBox.querySelector('input[type="text"]');
@@ -418,6 +424,8 @@ class RealBrowserWatermarkTests(unittest.TestCase):
           }]
         };
         render(testJob);
+        document.querySelector('.clip-review summary').click();
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         const wmBox = document.querySelector('.watermark-editor');
         const overlay = wmBox.querySelector('.watermark-preview-overlay');
@@ -505,6 +513,8 @@ class RealBrowserWatermarkTests(unittest.TestCase):
           }]
         };
         render(testJob);
+        document.querySelector('.clip-review summary').click();
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         const wmBox = document.querySelector('.watermark-editor');
         const clashWarning = wmBox.querySelector('.watermark-clash-warning');

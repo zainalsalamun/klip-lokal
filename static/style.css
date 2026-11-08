@@ -252,3 +252,26 @@ main{margin-left:230px;padding:0 40px;max-width:1500px}
 .studio-draft-dialog .delete-dialog-actions button{flex:1 0 auto}
 .studio-draft-dialog .studio-draft-save{background:#d7ed67;color:#28331f}
 .studio-draft-dialog .studio-draft-save:disabled{opacity:.6;cursor:wait}
+
+.clip-source{display:flex;flex-direction:column;gap:5px;margin:12px 0;padding:12px;background:#f6f8f0;border:1px solid #e0e6d5;border-radius:8px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.clip-source strong{font-size:10px;color:#737e65}
+.clip-source a{color:#526a2a;text-decoration:underline;text-underline-offset:3px}
+.clip-source a:focus-visible{outline:2px solid #8fa44d;outline-offset:3px}
+
+#clips{align-items:start}
+.clip{min-width:0}
+.clip video{display:block;margin:12px 0;max-height:320px;object-fit:contain}
+.clip-toolbar{display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:12px;margin-top:20px}
+.clip-toolbar>strong{align-self:center}
+.clip-toolbar>div{width:min(100%,220px)}
+.clip-card-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.clip-card-heading h3{margin:0}
+.clip-score{padding:4px 8px;border-radius:999px;background:#eaf1d9;color:#40562a;font-size:11px;font-weight:700}
+.clip .time{color:#56624b}
+.clip .clip-excerpt{-webkit-line-clamp:3;overflow-wrap:anywhere}
+.clip-review{margin-top:8px}
+.clip-review>summary{padding:12px;border-radius:6px;background:#eef2e5;color:#344524;font-weight:700;cursor:pointer}
+.clip-review>summary:hover{background:#e4ebd6}
+.clip-review>summary:focus-visible{outline:2px solid #748b3e;outline-offset:2px}
+.clip-draft-note{display:none;margin:8px 0 0;color:#805d21}
+.clip-review:has(.has-unsaved) .clip-draft-note{display:block}

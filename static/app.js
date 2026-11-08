@@ -1,5 +1,4 @@
 const form = document.querySelector('#form');
-const isGlobalStudio = document.body.classList.contains('global-studio');
 const button = document.querySelector('#submit');
 const statusEl = document.querySelector('#status');
 const errorEl = document.querySelector('#error');
@@ -16,8 +15,21 @@ const historyResultStatus = document.createElement('p');
 historyResultStatus.setAttribute('role', 'status');
 let resultsInHistory = false;
 
+function clearClips() {
+  for (const video of clipsGrid.querySelectorAll('video')) {
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+  }
+  clipsGrid.replaceChildren();
+  results.querySelector('.clip-toolbar')?.remove();
+}
+
 function syncResultsVisibility() {
   results.hidden = resultsInHistory !== (location.hash === '#history') || !clipsGrid.children.length;
+  if (results.hidden) {
+    for (const video of clipsGrid.querySelectorAll('video')) video.pause();
+  }
 }
 function syncView() {
   const showingHistory = location.hash === '#history';
@@ -136,9 +148,6 @@ async function api(path, options) {
   }
   return data;
 }
-function remember(id) {
-  try { if (id) localStorage.setItem('klip-selected', id); else localStorage.removeItem('klip-selected'); } catch (_) {}
-}
 function showError(message) {
   if (errorEl) errorEl.textContent = message;
   if (button) button.disabled = Boolean(activeJobId);
@@ -219,6 +228,8 @@ document.addEventListener('click', event => {
       await draftSavers.get(editor)?.();
       if (editor.classList.contains('has-unsaved')) {
         dialog.close();
+        const review = editor.closest('.clip-review');
+        if (review) review.open = true;
         if (location.hash === '#history' && !editor.getClientRects().length) {
           history.replaceState(null, '', location.pathname + location.search);
           syncView();
@@ -1183,22 +1194,94 @@ function render(job) {
   if (resultsNote) resultsNote.textContent = job.content_profile === 'kids' ? 'Kandidat untuk ditinjau · Anak 3–5 · Indonesia. Tujuan brief: ' + (job.kids_metadata?.brief_snapshot?.learning_goal || 'Tinjau konsep pembelajaran') + '. Label ini bukan sertifikasi kesesuaian usia.' : job.audience === 'global_en' ? 'Subtitle dan caption: English · suara asli dipertahankan. Tinjau terjemahan dan konteks sebelum posting.' : 'Pilihan berdasarkan transkrip, bukan jaminan viral. Tinjau framing dan batas ucapan sebelum posting.';
   document.querySelector('#result-title').textContent = job.title || 'Klip siap ditinjau';
   const grid = document.querySelector('#clips');
-  grid.replaceChildren();
-  (job.clips || []).forEach((c, i) => {
+  clearClips();
+  const clips = job.clips || [];
+  const resultsHead = document.querySelector('#results .results-head');
+  const cards = clips.map((c, i) => {
     const card = document.createElement('article'); card.className = 'clip';
-    const video = document.createElement('video'); video.controls = true; video.preload = 'metadata'; video.src = c.url;
+    const video = document.createElement('video'); video.controls = true; video.preload = 'none';
+    video.addEventListener('play', () => {
+      for (const other of clipsGrid.querySelectorAll('video')) if (other !== video) other.pause();
+    }); video.src = c.url;
     const heading = document.createElement('h3'); heading.textContent = 'Klip ' + String(i+1).padStart(2, '0');
-    const time = document.createElement('span'); time.className = 'time'; time.textContent = formatTime(c.start) + ' — ' + formatTime(c.end) + ' di video asli';
-    const text = document.createElement('p'); text.textContent = c.text;
+    const time = document.createElement('span'); time.className = 'time';
+    time.textContent = formatTime(c.start) + ' — ' + formatTime(c.end) + ' di video asli · ' + formatTime(c.end - c.start);
+    const text = document.createElement('p'); text.className = 'clip-excerpt'; text.textContent = c.text;
+    const score = document.createElement('span'); score.className = 'clip-score';
+    score.hidden = !Number.isFinite(c.score);
+    if (!score.hidden) {
+      score.textContent = 'Skor ' + c.score.toLocaleString('id-ID', {maximumFractionDigits: 2});
+      score.title = 'Skor pemilihan kandidat dari transkrip';
+    }
+    const cardHead = document.createElement('div'); cardHead.className = 'clip-card-heading';
+    cardHead.append(heading, score);
+    const source = document.createElement('div'); source.className = 'clip-source';
+    const sourceLabel = document.createElement('strong'); sourceLabel.textContent = 'Sumber video';
+    const sourceDetails = document.createElement('span');
+    sourceDetails.textContent = job.source_name || 'Keterangan sumber belum tersedia untuk hasil lama.';
+    if (job.source_url) {
+      sourceDetails.textContent = job.title || 'Video YouTube';
+      try {
+        const originalUrl = new URL(job.source_url);
+        if (['http:', 'https:'].includes(originalUrl.protocol) &&
+            ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'].includes(originalUrl.hostname)) {
+          const link = document.createElement('a');
+          link.href = originalUrl.href; link.target = '_blank'; link.rel = 'noopener noreferrer';
+          link.textContent = 'Buka video asli ↗';
+          sourceDetails.append(document.createElement('br'), link);
+        }
+      } catch (_) {}
+    } else if (job.source_name) {
+      sourceDetails.textContent = 'File lokal · ' + job.source_name;
+    }
+    source.append(sourceLabel, sourceDetails);
     const download = document.createElement('a'); download.className = 'download'; download.href = c.url + '?download=1'; download.textContent = 'Unduh MP4 ↓';
     const framing = document.createElement('small'); framing.className = 'framing-note'; framing.textContent = c.framing?.note || 'Hasil lama · crop tengah';
     const quality = document.createElement('p'); quality.className = 'quality-note';
     const qualityInfo = c.quality || c.framing?.quality;
     quality.hidden = !qualityInfo?.warning;
     quality.textContent = qualityInfo?.warning || '';
-    card.append(video, heading, time, framing, quality, text, download, captionEditor(c, i, job.id, job.audience), watermarkEditor(c, i, job.id), clipOutputTools(c, job, i)); grid.append(card);
+    const review = document.createElement('details'); review.className = 'clip-review';
+    const summary = document.createElement('summary'); summary.textContent = 'Edit & ekspor';
+    const draft = document.createElement('small'); draft.className = 'clip-draft-note';
+    draft.textContent = 'Ada draft belum disimpan';
+    summary.append(draft);
+    review.append(summary);
+    review.addEventListener('toggle', function loadEditor() {
+      if (!review.open || !review.isConnected) return;
+      review.removeEventListener('toggle', loadEditor);
+      review.append(framing, quality, captionEditor(c, i, job.id, job.audience), watermarkEditor(c, i, job.id), clipOutputTools(c, job, i));
+      window.KlipSelect?.mount(review);
+    });
+    card.append(cardHead, time, video, text, source, download, review);
+    grid.append(card);
+    return {card, clip: c, index: i};
   });
-  window.KlipSelect?.mount(grid);
+  if (cards.length) {
+    const toolbar = document.createElement('div'); toolbar.className = 'clip-toolbar';
+    const count = document.createElement('strong'); count.textContent = cards.length + ' kandidat klip';
+    toolbar.append(count);
+    if (cards.length > 1) {
+      const field = document.createElement('div');
+      const label = document.createElement('label'); label.htmlFor = 'clip-sort'; label.textContent = 'Urutkan klip';
+      const sort = document.createElement('select'); sort.id = 'clip-sort';
+      sort.innerHTML = '<option value="rank">Rekomendasi</option><option value="time">Waktu di sumber</option><option value="duration">Durasi terpanjang</option>';
+      sort.addEventListener('change', () => {
+        const ordered = cards.slice().sort((a, b) => {
+          if (sort.value === 'time') return a.clip.start - b.clip.start;
+          if (sort.value === 'duration') return (b.clip.end - b.clip.start) - (a.clip.end - a.clip.start);
+          return a.index - b.index;
+        });
+        ordered.forEach(({card}, index) => {
+          if (grid.children[index] !== card) grid.insertBefore(card, grid.children[index]);
+        });
+      });
+      field.append(label, sort);
+      toolbar.append(field);
+    }
+    resultsHead.append(toolbar);
+    window.KlipSelect?.mount(toolbar);
+  }
   syncResultsVisibility();
 }
 function display(job) {
@@ -1320,16 +1403,15 @@ async function deleteJob(job, remove) {
       for (const key of Object.keys(localStorage)) if (key.startsWith('klip-caption:/files/' + job.id + '/')) localStorage.removeItem(key);
     } catch (_) {}
     if (selectedJobId === job.id) {
-      ++selectionVersion; selectedJobId = null; remember(null);
+      ++selectionVersion; selectedJobId = null;
       document.querySelector('#results').hidden = true;
-      clipsGrid.replaceChildren();
+      clearClips();
       historyResultStatus.textContent = '';
       const progress = document.querySelector('#progress');
       if (progress) progress.hidden = true;
       if (errorEl) errorEl.textContent = '';
     }
-    const remaining = await refreshHistory();
-    if (location.hash !== '#history' && !isGlobalStudio && !selectedJobId && remaining.length) await openJob(activeJobId || remaining[0].id);
+    await refreshHistory();
     historyMessage.textContent = 'Riwayat dan semua berkas pekerjaan berhasil dihapus dari disk.';
   } catch (error) {
     remove.disabled = false;
@@ -1372,12 +1454,12 @@ async function openJob(id) {
   }
   if (fromHistory) {
     resultsInHistory = true;
-    clipsGrid.replaceChildren();
+    clearClips();
     syncResultsVisibility();
     historyResultStatus.textContent = 'Memuat hasil klip…';
   }
   const version = ++selectionVersion;
-  selectedJobId = id; remember(id); selectHistoryRow();
+  selectedJobId = id; selectHistoryRow();
   if (mobileWidth.matches && document.body.classList.contains('sidebar-open')) setSidebar(false);
   try {
     const job = await api('/api/jobs/' + encodeURIComponent(id));
@@ -1430,9 +1512,24 @@ async function poll(id) {
   if (activeJobId !== id) return;
   if (job.done) {
     activeJobId = null; if (button) button.disabled = false;
-    try { localStorage.removeItem('klip-job'); } catch (_) {}
+    const progress = document.querySelector('#progress');
+    if (progress && selectedJobId !== id) progress.hidden = true;
   }
-  try { if (selectedJobId === id) display(job); }
+  try {
+    if (selectedJobId === id) {
+      const completedHere = job.done && !job.error && job.clips?.length && !resultsInHistory;
+      if (completedHere) {
+        resultsInHistory = true;
+        resetSourceForm();
+        const progress = document.querySelector('#progress');
+        if (progress) progress.hidden = true;
+        if (location.hash !== '#history') history.pushState(null, '', '#history');
+        syncView();
+      }
+      display(job);
+      if (completedHere) results.scrollIntoView({block: 'start'});
+    }
+  }
   catch (error) {
     const message = 'Hasil belum dapat ditampilkan di antarmuka. Muat ulang halaman. (' + error.message + ')';
     if (resultsInHistory) historyResultStatus.textContent = message;
@@ -1463,6 +1560,13 @@ if (urlEl) {
     }
   });
 }
+function resetSourceForm() {
+  if (!form) return;
+  form.reset();
+  if (form.dataset.kidsDuration) form.elements.duration.value = form.dataset.kidsDuration;
+  syncFormat();
+  document.querySelector('#upload-label').textContent = '＋ Pilih file video';
+}
 const newJobBtn = document.querySelector('#new-job');
 if (newJobBtn) {
   newJobBtn.addEventListener('click', () => {
@@ -1470,13 +1574,11 @@ if (newJobBtn) {
       if (!window.confirm('Ada perubahan caption yang belum disimpan ke server. Tetap buat klip baru tanpa menyimpan?')) return;
     }
     history.replaceState(null, '', location.pathname + location.search); syncView(); window.scrollTo(0, 0);
-    ++selectionVersion; selectedJobId = null; remember(null);
+    ++selectionVersion; selectedJobId = null;
     resultsInHistory = false;
-    clipsGrid.replaceChildren();
+    clearClips();
     historyResultStatus.textContent = '';
-    if (form) { form.reset(); syncFormat(); }
-    const upl = document.querySelector('#upload-label');
-    if (upl) upl.textContent = '＋ Pilih file video';
+    resetSourceForm();
     const resEl = document.querySelector('#results');
     if (resEl) resEl.hidden = true;
     const progEl = document.querySelector('#progress');
@@ -1507,11 +1609,10 @@ if (form) {
       if (form.elements.audience?.value === 'global_en' && !health.capabilities?.includes('global_en')) throw Error('Studio Global memerlukan server versi baru. Setelah video aktif selesai, restart server lalu coba lagi.');
       const result = await api('/api/jobs', {method:'POST', body:new FormData(form)});
       clearTimeout(timer); ++selectionVersion;
-      activeJobId = selectedJobId = result.id; remember(result.id);
+      activeJobId = selectedJobId = result.id;
       resultsInHistory = false;
-      clipsGrid.replaceChildren();
+      clearClips();
       historyResultStatus.textContent = '';
-      try { localStorage.setItem('klip-job', result.id); } catch (_) {}
       const resEl = document.querySelector('#results');
       if (resEl) resEl.hidden = true;
       const perc = document.querySelector('#percent');
@@ -2100,16 +2201,16 @@ function initKidsStudio() {
 async function init() {
   try {
     const jobs = await refreshHistory();
-    const active = jobs.find(job => !job.done);
-    activeJobId = historyState.activeId || active?.id || null;
-    if (button) button.disabled = Boolean(activeJobId);
-    let saved; try { saved = localStorage.getItem('klip-selected') || localStorage.getItem('klip-job'); } catch (_) {}
-    const initialActiveId = activeJobId;
-    const selectedId = saved || activeJobId || jobs[0]?.id;
-    if (selectedId && !isGlobalStudio && location.hash !== '#history' && !(document.body.classList.contains('kids-studio') || document.body.classList.contains('kids-source'))) {
-      await openJob(selectedId);
+    const runningId = historyState.activeId || jobs.find(job => !job.done)?.id;
+    if (runningId && !activeJobId) {
+      activeJobId = runningId;
+      if (button) {
+        button.disabled = true;
+        document.querySelector('#progress').hidden = false;
+        statusEl.textContent = 'Ada video sedang diproses. Lihat statusnya di Riwayat klip.';
+      }
+      poll(runningId);
     }
-    if (initialActiveId && activeJobId === initialActiveId) poll(initialActiveId);
   } catch (error) {
     if (historyMessage) historyMessage.textContent = error instanceof ConnectionError ? connectionMessage : 'Riwayat tidak dapat dimuat: ' + error.message;
   }
