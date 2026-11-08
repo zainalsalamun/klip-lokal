@@ -121,6 +121,7 @@ def crop_plan(source, audio, start, end, width, height):
     max_x = 0
     with av.open(str(source)) as video:
         stream = video.streams.video[0]
+        stream.codec_context.thread_count = 2
         video.seek(max(0, int(start / stream.time_base)), stream=stream, backward=True)
         next_time = start
         for frame in video.decode(stream):

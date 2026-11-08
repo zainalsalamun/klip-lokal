@@ -121,7 +121,7 @@ Commit source, dokumentasi, `requirements.txt`, `package.json` dan `runtime/pack
 
 ## Pengembangan berikutnya
 
-Peningkatan yang belum tersedia meliputi penyelarasan kata subtitle, pemilihan semantik, deteksi pembicara berbasis model audio-visual, editor manual, cancel/resume dan cleanup. Jika hendak hosting online, pisahkan worker video dari web server dan rancang ulang akses/data; lihat batas deployment di [arsitektur](ARCHITECTURE.md).
+Peningkatan yang belum tersedia meliputi penyelarasan kata subtitle, pemilihan semantik, deteksi pembicara berbasis model audio-visual, editor manual, cancel dan cleanup. Resume manual tersedia melalui endpoint jobs/resume dengan checkpoint tahap. Jika hendak hosting online, pisahkan worker video dari web server dan rancang ulang akses/data; lihat batas deployment di [arsitektur](ARCHITECTURE.md).
 
 ## Verifikasi pengelolaan server
 

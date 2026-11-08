@@ -5,6 +5,7 @@ from pathlib import Path
 SOURCE_HEIGHTS = {'1080':1080, '1440':1440, '2160':2160}
 ENCODER_PRESET = 'fast'
 ENCODER_CRF = '18'
+ENCODER_LOOKAHEAD = 'rc-lookahead=8:sync-lookahead=0'
 SCALE_FLAGS = 'lanczos'
 
 

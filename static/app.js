@@ -1353,7 +1353,36 @@ function renderHistory(jobs) {
     remove.disabled = !job.done;
     remove.title = job.done ? 'Hapus riwayat dan semua berkas video ini dari disk' : 'Tunggu pemrosesan selesai sebelum menghapus';
     remove.addEventListener('click', () => deleteJob(job, remove));
-    item.append(row, remove); historyList.append(item);
+    const actions = document.createElement('div'); actions.className = 'history-item-actions';
+    if (job.done && job.error) {
+      const resume = document.createElement('button'); resume.type = 'button'; resume.className = 'history-resume';
+      resume.textContent = 'Lanjutkan proses';
+      resume.disabled = Boolean(activeJobId);
+      resume.addEventListener('click', async () => {
+        if (activeJobId || resume.disabled) return;
+        if (hasUnsavedCaptionEdits() && !window.confirm('Ada draft belum disimpan. Tetap lanjutkan pekerjaan ini?')) return;
+        resume.disabled = true; remove.disabled = true; resume.textContent = 'Melanjutkan…';
+        try {
+          const health = await api('/api/health');
+          if (!health.capabilities?.includes('resume_jobs')) throw Error('Restart aplikasi setelah proses aktif selesai untuk memakai Lanjutkan proses.');
+          const result = await api('/api/jobs/' + encodeURIComponent(job.id) + '/resume', {method:'POST'});
+          activeJobId = result.id;
+          if (button) button.disabled = true;
+          clearTimeout(timer);
+          ++selectionVersion; selectedJobId = null;
+          clearClips();
+          if (location.hash === '#history') await openJob(result.id);
+          poll(result.id);
+          refreshHistory().catch(historyError);
+        } catch (error) {
+          historyMessage.textContent = error instanceof ConnectionError ? connectionMessage : error.message;
+          resume.disabled = false; remove.disabled = false; resume.textContent = 'Lanjutkan proses';
+        }
+      });
+      actions.append(resume);
+    }
+    actions.append(remove);
+    item.append(row, actions); historyList.append(item);
   }
   selectHistoryRow();
 }

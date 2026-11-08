@@ -71,3 +71,8 @@ Smoke live K2/K3: lihat [hasil dan batas](reviews/KIDS_K2_K3_SMOKE_TEST.md). Lau
 
 
 `test_media_quality.py`: selector yt-dlp asli secara offline memilih stream HD terpisah dibanding combined360p; download+merge nyata via HTTP loopback dan FFmpeg bawaan; metadata/upscale dan validasi API; trajectory per-frame/CFR/VFR/time bounds/cut reset; serta render piksel nyata dengan phase correlation untuk memastikan posisi perantara muncul. Pengujian download lokal ini tidak membuktikan ketersediaan/akses format pada setiap URL YouTube.
+
+Resume dan memori: `test_resume.py` memeriksa reservasi worker, klik ulang, disk penuh, startup gagal, file lokal hilang, reuse source/transkrip/klip setelah restart, pemotongan audio 5 menit beserta offset waktu, dan pelepasan model saat error. Tes Chrome Studio Anak memeriksa tombol resume di Riwayat pada layar kecil. Model AI dipalsukan pada tes ini. Pengukuran RAM puncak video panjang dilakukan terpisah.
+
+
+Uji performa sintetis 7 November 2026 pada laptop pengembangan: render 4 detik, sumber 1920×1080/30fps, hasil 1080×1920 dengan latar blur. Puncak RSS proses anak yang diukur melalui `resource.RUSAGE_CHILDREN` turun dari 377,0 MiB menjadi 225,5 MiB setelah lookahead encoder dibatasi. Waktu satu pengukuran turun dari 10,92 menjadi 8,10 detik. Angka ini khusus tahap render pada fixture tersebut. Pengukuran belum mencakup inferensi model nyata atau video panjang. Tes Chrome juga memeriksa preload none, jeda pemutaran klip lain, serta pelepasan sumber video lama.

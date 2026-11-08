@@ -409,3 +409,8 @@ Health capabilities `source_quality` dan `smooth_crop` menandai backend baru. Fr
 
 
 `POST /api/jobs` menerima `framing_layout=wide|full`. API default `full` untuk klien lama; form menawarkan `wide` sebagai pilihan awal. Nilai invalid ditolak 400. Metadata job/klip menyimpan layout, dan health capability `wide_crop` menunjukkan dukungan backend.
+
+
+## Resume pekerjaan
+
+`POST /api/jobs/<jid>/resume` melanjutkan pekerjaan gagal atau terputus dengan pengaturan tersimpan dan ID yang sama. Respons 202 berisi `{id}`. Pekerjaan aktif atau berhasil, media/AI lain sedang berjalan, atau sumber lokal hilang ditolak 409. ID tidak tersedia ditolak 404, pengaturan lama tidak valid 400, dan kegagalan penyimpanan atau startup worker 500. Reservasi worker disimpan atomik sebelum thread dimulai. Sumber, transkrip lengkap, dan metadata checkpoint klip yang selesai digunakan kembali bila valid.

@@ -31,7 +31,7 @@ Berlaku untuk seluruh repository Klip lokal. Baca file ini sebelum mengubah kode
 - Aplikasi untuk satu pengguna lokal, bind `127.0.0.1`. Jangan menambahkan cloud fallback, telemetry transkrip, atau bind publik tanpa permintaan pengguna.
 - Jangan menghapus video, history, model, cache atau draft pengguna untuk pengujian. Gunakan direktori sementara dan fixture milik tes.
 - Periksa health sebelum restart. Jangan menghentikan video atau caption AI yang sedang diproses. Gunakan controller bila server dikelola launcher; server foreground dihentikan lewat Terminal asalnya saat idle.
-- Satu worker video aktif per proses. Jangan menambah server kedua yang memakai folder `data/` sama. Tidak ada resume pekerjaan yang terputus.
+- Satu worker video aktif per proses. Jangan menambah server kedua yang memakai folder `data/` sama. Pekerjaan gagal dapat dilanjutkan melalui endpoint resume dengan memakai checkpoint tersimpan.
 - Metadata lama harus tetap terbaca dengan default yang sesuai. Penyimpanan metadata harus atomik; jangan menyimpan objek model/lock ke JSON.
 - Menu **Riwayat klip** ada di sidebar; pencarian, filter, daftar dan pagination berada di area utama. Jangan memindahkan seluruh daftar ke sidebar.
 - Caption Studio lokal bahasa Indonesia; caption/subtitle Global bahasa Inggris, audio asli. Jangan mengganti audio menjadi dubbing tanpa permintaan.

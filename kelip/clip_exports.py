@@ -4,7 +4,7 @@ import subprocess
 import cv2
 import numpy as np
 from . import watermark
-from .media_quality import ENCODER_PRESET, ENCODER_CRF
+from .media_quality import ENCODER_PRESET, ENCODER_CRF, ENCODER_LOOKAHEAD
 
 
 def render_export(ffmpeg, source, destination, config, assets_dir, *, kind, frame_time=0, ratio='vertical'):
@@ -59,13 +59,13 @@ def render_export(ffmpeg, source, destination, config, assets_dir, *, kind, fram
             if not cv2.imwrite(str(overlay), rgba):
                 raise OSError('Gagal menulis overlay.')
             run(ffmpeg, ['-i', str(source), '-i', str(overlay), '-filter_complex', '[0:v][1:v]overlay=0:0:format=auto[v]',
-                         '-map', '[v]', '-map', '0:a?', '-c:v', 'libx264', '-preset', ENCODER_PRESET,
-                         '-crf', ENCODER_CRF, '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', str(destination)])
+                         '-map', '[v]', '-map', '0:a?', '-c:v', 'libx264', '-threads', '2', '-preset', ENCODER_PRESET,
+                         '-crf', ENCODER_CRF, '-x264-params', ENCODER_LOOKAHEAD, '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', str(destination)])
         finally:
             overlay.unlink(missing_ok=True)
 
 
 def run(ffmpeg, args):
-    result = subprocess.run([ffmpeg, '-hide_banner', '-y', *args], capture_output=True, text=True, timeout=3600)
+    result = subprocess.run([ffmpeg, '-hide_banner', '-y', '-threads', '2', '-filter_complex_threads', '1', *args], capture_output=True, text=True, timeout=3600)
     if result.returncode:
         raise RuntimeError('Ekspor gagal: ' + result.stderr[-1000:])

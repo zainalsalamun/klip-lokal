@@ -99,7 +99,7 @@ Lihat [peta dokumentasi](docs/README.md). Developer mulai dari [CONTRIBUTING.md]
 - Crop memperkirakan pembicara dari wajah/gerakan mulut, dengan fallback tengah; belum ada editor manual. Resolusi tinggi tidak menambah detail sumber yang rendah dan membutuhkan lebih banyak waktu/ruang.
 - Waktu subtitle per kelompok kata diperkirakan dari segmen Whisper, bukan waktu setiap kata.
 - Satu pekerjaan aktif per proses server. Jumlah kandidat dan durasi hasil dapat lebih kecil dari pilihan.
-- Riwayat tersimpan di server dan bisa dibuka kembali. Belum ada resume proses setelah server berhenti atau antrean permanen.
+- Riwayat tersimpan di server dan bisa dibuka kembali. Pekerjaan gagal dapat dilanjutkan dari Riwayat klip dengan checkpoint yang tersedia.
 - Unduhan YouTube bergantung pada ketersediaan video dan pembatasan layanan/jaringan.
 
 ## Data dan akses

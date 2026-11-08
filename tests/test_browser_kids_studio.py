@@ -154,6 +154,41 @@ class RealBrowserKidsStudioTests(unittest.TestCase):
         """
         self._run_chrome_test(js)
 
+    def test_failed_history_can_resume_without_double_submission(self):
+        script = """
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const failed = {id:'failed', title:'Video gagal', done:true, error:'Interrupted',
+          clips:[], clip_count:0};
+        let resumeCalls = 0, finishResume;
+        let current = failed;
+        window.api = async (path, options) => {
+          if (path === '/api/health') return {capabilities:['resume_jobs']};
+          if (path.endsWith('/resume')) {
+            resumeCalls++;
+            return new Promise(resolve => { finishResume = resolve; });
+          }
+          if (path.startsWith('/api/jobs/')) return current;
+          if (path.startsWith('/api/jobs?')) return {jobs:[current]};
+          return {presets:[]};
+        };
+        location.hash = '#history';
+        await new Promise(resolve => setTimeout(resolve, 50));
+        renderHistory([failed]);
+        const resume = document.querySelector('.history-resume');
+        resume.click(); resume.click();
+        await new Promise(resolve => setTimeout(resolve, 10));
+        assert(resumeCalls === 1 && resume.disabled, 'Klik ganda hanya mengirim satu resume');
+        current = {...failed, done:true, error:null, title:'Dilanjutkan',
+          clips:[{clip_id:'fixture',url:'fixture.mp4',start:0,end:3,text:'Fixture'}]};
+        finishResume({id:failed.id});
+        await new Promise(resolve => setTimeout(resolve, 80));
+        assert(location.hash === '#history' && !results.hidden, 'Hasil resume tetap di Riwayat');
+        assert(document.querySelector('#result-title').textContent === 'Dilanjutkan', 'Hasil resume tampil');
+        assert(!document.querySelector('.history-resume'), 'Tombol resume hilang setelah sukses');
+        assert(document.documentElement.scrollWidth <= window.innerWidth, 'Aksi riwayat tidak meluap di mobile');
+        """
+        self._run_chrome_test(script, window_size="375,667")
+
     def test_history_opens_results_without_showing_kids_editor(self):
         script = """
         const job = {id:'history-job', title:'Klip dari Studio Klip', done:true, clip_count:1,

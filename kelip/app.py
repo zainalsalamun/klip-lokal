@@ -1,8 +1,11 @@
 from pathlib import Path
-import json, math, re, subprocess, threading, uuid, os, copy, shutil
+import json, math, re, subprocess, threading, uuid, os, copy, shutil, wave, gc
 from datetime import datetime, timezone
 from collections import OrderedDict
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+for thread_setting in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+                       "VECLIB_MAXIMUM_THREADS", "OPENCV_FOR_THREADS_NUM"):
+    os.environ.setdefault(thread_setting, "2")
 from urllib.parse import urlparse
 from flask import Flask, request, jsonify, send_from_directory, render_template, redirect, Response
 import imageio_ffmpeg
@@ -12,7 +15,7 @@ from .local_caption import summarize, CaptionUnavailable, UnclearTranscript, inf
 from . import watermark
 from . import kids_content
 from . import clip_exports
-from .media_quality import download_options, downloaded_path, probe_media, output_quality, SOURCE_HEIGHTS, ENCODER_PRESET, ENCODER_CRF, SCALE_FLAGS
+from .media_quality import download_options, downloaded_path, probe_media, output_quality, SOURCE_HEIGHTS, ENCODER_PRESET, ENCODER_CRF, ENCODER_LOOKAHEAD, SCALE_FLAGS
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -130,7 +133,7 @@ def read_job(jid):
         if not isinstance(job, dict):
             return None
         if not job.get("done"):
-            job.update(done=True, status="Gagal", error="Proses terhenti saat aplikasi ditutup. Mulai ulang video.")
+            job.update(done=True, status="Gagal", error="Proses terhenti saat aplikasi ditutup. Klik Lanjutkan proses di Riwayat klip.")
     if not isinstance(job, dict):
         return None
     job["id"] = jid
@@ -261,9 +264,9 @@ def render_clip(source, ass, out, start, end, resolution="720", framing_layout="
     framing["quality"] = output_quality(probe_media(source), width, height, foreground_height=main_height)
     framing["encoder"] = {"preset":ENCODER_PRESET, "crf":int(ENCODER_CRF), "scale":SCALE_FLAGS}
     ass.with_suffix('.framing.json').write_text(json.dumps(framing, ensure_ascii=False))
-    result = subprocess.run([FFMPEG, "-hide_banner", "-y", "-ss", str(start), "-i", str(source.resolve()),
-                             "-t", str(end-start), "-vf", vf, "-c:v", "libx264", "-preset", ENCODER_PRESET,
-                             "-crf", ENCODER_CRF, "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", str(out.resolve())],
+    result = subprocess.run([FFMPEG, "-hide_banner", "-y", "-threads", "2", "-filter_threads", "1", "-ss", str(start), "-i", str(source.resolve()),
+                             "-t", str(end-start), "-vf", vf, "-c:v", "libx264", "-threads", "2", "-preset", ENCODER_PRESET,
+                             "-crf", ENCODER_CRF, "-x264-params", ENCODER_LOOKAHEAD, "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", str(out.resolve())],
                             cwd=ass.parent, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError("Ekspor gagal: " + result.stderr[-1200:])
@@ -277,12 +280,82 @@ def kids_caption(result):
     return result
 
 
-def process(jid, url, local, duration, count, lang, resolution="720", audience="local", topic="general", subtitle_style="classic", source_quality="1080", framing_layout="full"):
+def saved_source(folder):
+    for name in ("source.mp4", "source.webm", "source.mkv", "source.mov"):
+        path = folder / name
+        if path.is_file() and not path.is_symlink() and probe_media(path):
+            return path
+    return None
+
+
+def cached_transcript(path):
+    try:
+        segments = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(segments, list):
+            return None
+        for segment in segments:
+            if (not isinstance(segment, dict) or not isinstance(segment.get("text"), str) or
+                any(type(segment.get(key)) not in (int, float) or not math.isfinite(segment[key])
+                    for key in ("start", "end")) or not 0 <= segment["start"] < segment["end"]):
+                return None
+        return segments
+    except (OSError, ValueError):
+        return None
+
+
+def transcribe_audio(audio, lang, audience):
+    """Bound Whisper's audio buffers to five minutes and preserve source timestamps."""
+    global model
+    with model_lock:
+        owned_model = model is None
+        try:
+            if owned_model:
+                from faster_whisper import WhisperModel
+                model = WhisperModel("base", device="cpu", compute_type="int8", cpu_threads=2,
+                                     num_workers=1, download_root=str(DATA / "models"))
+            options = dict(language=None if lang == "auto" else lang, vad_filter=True,
+                           beam_size=3, task="translate" if audience == "global_en" else "transcribe")
+            try:
+                with wave.open(str(audio), "rb") as stream:
+                    duration = stream.getnframes() / stream.getframerate()
+            except (OSError, EOFError, wave.Error):
+                duration = 0
+            if duration <= 300:
+                stream, _ = model.transcribe(str(audio), **options)
+                return [dict(start=s.start, end=s.end, text=s.text.strip()) for s in stream]
+            segments = []
+            chunk = audio.with_name("transcribe-chunk.wav")
+            try:
+                with wave.open(str(audio), "rb") as source:
+                    rate = source.getframerate()
+                    offset = 0
+                    while offset < source.getnframes():
+                        frames = source.readframes(rate * 300)
+                        with wave.open(str(chunk), "wb") as target:
+                            target.setparams(source.getparams())
+                            target.writeframes(frames)
+                        del frames
+                        stream, _ = model.transcribe(str(chunk), **options)
+                        segments.extend(dict(start=s.start + offset / rate, end=s.end + offset / rate,
+                                             text=s.text.strip()) for s in stream)
+                        offset = source.tell()
+                return segments
+            finally:
+                chunk.unlink(missing_ok=True)
+        finally:
+            if owned_model:
+                model = None
+                gc.collect()
+
+
+def process(jid, url, local, duration, count, lang, resolution="720", audience="local", topic="general", subtitle_style="classic", source_quality="1080", framing_layout="full", resume=False):
     try:
         folder=DATA/jid
-        source=local
+        source=saved_source(folder) if resume else local
+        if not source and not url:
+            raise RuntimeError("File sumber lokal tidak tersedia. Unggah kembali video melalui Proyek baru.")
         title=jobs[jid].get("title") or (local.name if local else "Video YouTube")
-        if url:
+        if url and not source:
             update(jid,status="Mengunduh video YouTube…",progress=8)
             import yt_dlp
             options = download_options(folder, FFMPEG, ROOT/"runtime/node_modules/node/bin/node", source_quality)
@@ -295,16 +368,15 @@ def process(jid, url, local, duration, count, lang, resolution="720", audience="
         update(jid, source_media=source_media)
         update(jid,title=title,status="Menyiapkan audio…",progress=25)
         audio=folder/"audio.wav"
-        run(["-i",source,"-vn","-ac","1","-ar","16000",audio])
         update(jid,status="Menerjemahkan subtitle ke bahasa Inggris…" if audience == "global_en" else "Mentranskripsi suara (model diunduh saat pertama digunakan)…",progress=35)
-        global model
-        with model_lock:
-            if model is None:
-                from faster_whisper import WhisperModel
-                model=WhisperModel("base",device="cpu",compute_type="int8",download_root=str(DATA/"models"))
-            stream,_=model.transcribe(str(audio),language=None if lang=="auto" else lang,vad_filter=True,beam_size=3,task="translate" if audience == "global_en" else "transcribe")
-            segments=[dict(start=s.start,end=s.end,text=s.text.strip()) for s in stream]
-        (folder/"transcript.json").write_text(json.dumps(segments,ensure_ascii=False))
+        transcript = folder / "transcript.json"
+        segments = cached_transcript(transcript) if resume else None
+        if segments is None:
+            run(["-threads", "2", "-i",source,"-vn","-ac","1","-ar","16000",audio])
+            segments = transcribe_audio(audio, lang, audience)
+            temporary = transcript.with_suffix(".tmp")
+            temporary.write_text(json.dumps(segments, ensure_ascii=False), encoding="utf-8")
+            temporary.replace(transcript)
         update(jid,status="Mencari kandidat klip dari transkrip…",progress=65)
         if jobs[jid].get("content_profile") == "kids":
             goal = jobs[jid].get("kids_metadata", {}).get("brief_snapshot", {}).get("learning_goal", "")
@@ -315,11 +387,17 @@ def process(jid, url, local, duration, count, lang, resolution="720", audience="
             if jobs[jid].get("content_profile") == "kids":
                 raise RuntimeError("Ucapan belum cukup jelas untuk kandidat anak. Lagu/gerak perlu pemilihan manual; simpan rencana brief dan gunakan sumber dengan narasi jelas.")
             raise RuntimeError("Tidak cukup percakapan untuk membuat klip. Coba video dengan suara yang jelas.")
+        completed = (jobs[jid].get("resume_clips") or jobs[jid].get("clips", [])) if resume else []
         clips=[]
         now_iso = datetime.now(timezone.utc).isoformat()
         for i,c in enumerate(selected):
             update(jid,status=f"Menyesuaikan crop pembicara & mengekspor klip {i+1}/{len(selected)}…",progress=70+int(28*i/len(selected)))
             ass=folder/f"clip-{i+1}.ass"; out=folder/f"clip-{i+1}.mp4"
+            previous = next((clip for clip in completed if clip.get("start") == c["start"] and
+                             clip.get("end") == c["end"] and clip.get("file") == out.name), None)
+            if previous and out.is_file() and not out.is_symlink() and probe_media(out):
+                clips.append(copy.deepcopy(previous))
+                continue
             write_subs(ass,segments,c["start"],c["end"],subtitle_style)
             framing = render_clip(source, ass, out, c["start"], c["end"], resolution, framing_layout=framing_layout)
             width, height = RESOLUTIONS[resolution]
@@ -331,7 +409,10 @@ def process(jid, url, local, duration, count, lang, resolution="720", audience="
                           "caption":make_caption(c["text"],audience),"caption_source":"extractive",
                           "caption_language":"id" if audience == "local" else "en",
                           "caption_updated_at":now_iso,"audience":audience})
+            update(jid, resume_clips=copy.deepcopy(clips))
         for i, clip in enumerate(clips):
+            if clip.get("caption_source") in ("manual", "ai_local"):
+                continue
             update(jid,status=f"AI lokal merangkum pembahasan klip {i+1}/{len(clips)}…",progress=98)
             try:
                 ai_res = summarize(clip["text"],audience)
@@ -342,7 +423,8 @@ def process(jid, url, local, duration, count, lang, resolution="720", audience="
                 clip["caption_updated_at"] = datetime.now(timezone.utc).isoformat()
             except (CaptionUnavailable, UnclearTranscript) as exc:
                 clip.update(caption="",caption_source="none",caption_status="needs_review" if isinstance(exc,UnclearTranscript) else "unavailable",caption_note=str(exc))
-        update(jid,status="Selesai",progress=100,clips=clips,done=True,schema_version=2)
+            update(jid, resume_clips=copy.deepcopy(clips))
+        update(jid,status="Selesai",progress=100,clips=clips,done=True,schema_version=2,resume_clips=[])
     except Exception as exc:
         update(jid,status="Gagal",error=str(exc),done=True)
 
@@ -361,7 +443,7 @@ def too_large(error):
 def health():
     with lock:
         active = sum(not job.get("done") for job in jobs.values())
-    return jsonify(app="klip-lokal", status="ok", active_jobs=active + int(active_export is not None), active_exports=int(active_export is not None), active_caption=inference_lock.locked() or bool(caption_requests), capabilities=["history_delete", "history_pagination", "global_en", "local_caption_ai", "caption_persistence", "watermark", "kids_studio", "kids_pipeline", "clip_exports", "smooth_crop", "source_quality", "wide_crop"])
+    return jsonify(app="klip-lokal", status="ok", active_jobs=active + int(active_export is not None), active_exports=int(active_export is not None), active_caption=inference_lock.locked() or bool(caption_requests), capabilities=["history_delete", "history_pagination", "global_en", "local_caption_ai", "caption_persistence", "watermark", "kids_studio", "kids_pipeline", "clip_exports", "smooth_crop", "source_quality", "wide_crop", "resume_jobs"])
 
 @app.get("/favicon.ico")
 def favicon(): return redirect("/static/favicon.svg", code=302)
@@ -632,6 +714,58 @@ def create():
             return jsonify(error="File tidak dapat disimpan. Periksa ruang disk."),400
     threading.Thread(target=process,args=(jid,url,local,duration,count,lang,resolution,audience,topic),kwargs={"subtitle_style":subtitle_style,"source_quality":source_quality,"framing_layout":framing_layout},daemon=True).start()
     return jsonify(id=jid),202
+
+@app.post("/api/jobs/<jid>/resume")
+def resume_job(jid):
+    with lock:
+        if not re.fullmatch(r"[a-f0-9]{32}", jid) or (DATA / jid).is_symlink():
+            return jsonify(error="Riwayat tidak ditemukan."), 404
+        job = read_job(jid)
+        if job is None:
+            return jsonify(error="Riwayat tidak ditemukan."), 404
+        if not job.get("done") or not job.get("error"):
+            return jsonify(error="Hanya pekerjaan gagal yang dapat dilanjutkan."), 409
+        if active_export or caption_requests or inference_lock.locked() or any(not j.get("done") for j in jobs.values()):
+            return jsonify(error="Ada pemrosesan aktif. Tunggu selesai sebelum melanjutkan."), 409
+        folder = DATA / jid
+        url = job.get("source_url")
+        if url:
+            parsed = urlparse(url)
+            if parsed.scheme not in ("http", "https") or parsed.hostname not in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}:
+                return jsonify(error="Link sumber tidak valid. Buat proyek baru dengan link YouTube."), 400
+        elif saved_source(folder) is None:
+            return jsonify(error="File sumber lokal tidak tersedia. Unggah kembali video melalui Proyek baru."), 409
+        duration, count = job.get("duration", 30), job.get("count", 3)
+        resolution, audience = job.get("resolution", "720"), job.get("audience", "local")
+        lang, topic = job.get("language", "auto"), job.get("topic", "general")
+        style, quality = job.get("subtitle_style", "classic"), job.get("source_quality", "1080")
+        layout = job.get("framing_layout", "full")
+        if (duration not in (15, 30, 45, 60) or count not in (1, 3, 5) or resolution not in RESOLUTIONS or
+            audience not in ("local", "global_en") or lang not in ("auto", "id", "en") or topic not in TOPICS or
+            style not in SUBTITLE_STYLES or quality not in SOURCE_HEIGHTS or layout not in ("full", "wide")):
+            return jsonify(error="Pengaturan lama tidak didukung. Buat proyek baru."), 400
+        resumed = copy.deepcopy(job)
+        resumed.update(done=False, error=None, status="Melanjutkan proses…", progress=0,
+                       updated_at=datetime.now(timezone.utc).isoformat())
+        try:
+            write_job_atomic(jid, resumed)
+        except OSError:
+            return jsonify(error="Gagal menyimpan status. Periksa ruang disk lalu coba lagi."), 500
+        jobs[jid] = resumed
+        history_cache.pop(str(folder.resolve()), None)
+        try:
+            worker = threading.Thread(target=process, args=(jid, url, None, duration, count, lang, resolution, audience, topic),
+                                      kwargs=dict(subtitle_style=style, source_quality=quality, framing_layout=layout, resume=True),
+                                      daemon=True)
+            worker.start()
+        except Exception as exc:
+            failed = copy.deepcopy(resumed)
+            failed.update(done=True, error="Proses tidak dapat dimulai. Coba lagi.", status="Gagal")
+            write_job_atomic(jid, failed)
+            jobs[jid] = failed
+            return jsonify(error=failed["error"]), 500
+    return jsonify(id=jid), 202
+
 
 def job_summary(folder):
     if not re.fullmatch(r"[a-f0-9]{32}", folder.name) or folder.is_symlink():

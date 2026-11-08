@@ -282,3 +282,10 @@ main{margin-left:230px;padding:0 40px;max-width:1500px}
 .subtitle-preview[data-style="orange"] .subtitle-sample{color:#ffb057;font-size:24px;-webkit-text-stroke:3px #101010}
 .subtitle-preview[data-style="purple_box"] .subtitle-sample{background:#4b305bdf;padding:6px 10px;border-radius:2px;-webkit-text-stroke:0;text-shadow:none}
 .subtitle-preview[data-style="light_box"] .subtitle-sample{color:#232c22;background:#fffffff0;padding:6px 10px;border-radius:2px;-webkit-text-stroke:0;text-shadow:none}
+
+.history-item-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0;width:100px}
+.history-item-actions .history-delete{width:100%;flex:1}
+.history-resume{width:100%;margin:0;padding:10px 8px;border:1px solid #b1c66d;border-radius:7px;background:#eef4d9;color:#35471f;font-size:11px;line-height:1.5}
+.history-resume:disabled{opacity:.5;cursor:wait}
+.history-resume:focus-visible{outline:2px solid #8fa44d;outline-offset:2px}
+@media(max-width:480px){.history-item-actions{width:80px}.history-resume{font-size:10px;min-height:44px}}
